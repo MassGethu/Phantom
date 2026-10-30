@@ -84,7 +84,7 @@ are marked `verified_together`. It shows the diff and asks `Apply these changes?
 It never commits. Requirements no rerun proved are listed as "needs a human" and
 never enter the lock.
 
-`doctor` currently prints `not implemented yet`.
+`ghost doctor [--lock assumptions.lock]` checks this machine against the lock without Docker or AI: env vars are set (values are never printed), files exist, tools are on PATH, versions match, and localhost ports accept connections. Exit 0 when all pass, 1 when any fail, 2 when the lock is missing or invalid.
 
 ### Development and handoff
 

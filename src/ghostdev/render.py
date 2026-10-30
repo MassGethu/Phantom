@@ -15,6 +15,7 @@ from rich.text import Text
 
 from ghostdev import config
 from ghostdev.bisect import BisectResult, FAIL, PASS
+from ghostdev.doctor import CheckResult, FAIL, PASS as CHECK_PASS
 from ghostdev.exorcise import ExorcisePlan
 from ghostdev.lockfile import requirement_id
 from ghostdev.models import Finding, RunResult, Status
@@ -171,5 +172,13 @@ def exorcise_written(paths: list[Path]) -> None:
     console.print("Review the changes and commit them yourself; GhostDev never commits.")
 
 
-def not_implemented() -> None:
-    console.print("not implemented yet")
+def doctor_results(results: list[CheckResult]) -> None:
+    console.print(Text(f"{config.APP_NAME} doctor", style="bold"))
+    for result in results:
+        icon = {CHECK_PASS: "✅", FAIL: "❌"}.get(result.state, "⚠️ ")
+        console.print(Text(f"{icon} {result.id}  {result.detail}"))
+        if result.hint:
+            console.print(Text(f"   hint: {result.hint}", style="dim"))
+    failed = sum(result.state == FAIL for result in results)
+    console.print(f"{failed} of {len(results)} checks failed." if failed else "All checks passed.",
+                  style="red" if failed else "green")

@@ -5,9 +5,10 @@ import subprocess
 
 import typer
 
-from ghostdev import render
+from ghostdev import lockfile, render
 from ghostdev.bisect import BoundaryError, InconclusiveError, run_bisect
 from ghostdev.diagnose import diagnose
+from ghostdev.doctor import FAIL, run_doctor
 from ghostdev.exorcise import DirtyReadmeError, apply as exorcise_apply, plan as exorcise_plan
 from ghostdev.lockfile import LockError
 from ghostdev.models import Finding, RunResult, Status
@@ -132,6 +133,14 @@ def exorcise(
 
 
 @app.command()
-def doctor() -> None:
-    """Check local requirements (planned for phase two)."""
-    render.not_implemented()
+def doctor(
+    lock: Path = typer.Option(Path(lockfile.LOCK_NAME), "--lock", help="Lock file to check against."),
+) -> None:
+    """Check this machine against assumptions.lock (no Docker, no AI)."""
+    try:
+        results = run_doctor(lock)
+    except (LockError, OSError) as error:
+        render.error(str(error))
+        raise typer.Exit(2)
+    render.doctor_results(results)
+    raise typer.Exit(1 if any(result.state == FAIL for result in results) else 0)
