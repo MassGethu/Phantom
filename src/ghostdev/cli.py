@@ -95,7 +95,7 @@ def bisect(
     except (InconclusiveError, OSError, ValueError) as error:
         render.error(str(error))
         raise typer.Exit(2)
-    render.bisect_result(result)
+    render.bisect_result(result, not no_ai)
     raise typer.Exit(0 if result.culprit else 2)
 
 

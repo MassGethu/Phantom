@@ -104,7 +104,7 @@ def bisect_probe(sha: str, verdict: str, cached: bool) -> None:
     console.print(Text(f"{icon} {sha[:7]}  {label}{suffix}"))
 
 
-def bisect_result(result: BisectResult) -> None:
+def bisect_result(result: BisectResult, use_ai: bool = True) -> None:
     if result.cache_note:
         console.print(Text(result.cache_note, style="yellow"))
     finding = result.finding
@@ -126,7 +126,8 @@ def bisect_result(result: BisectResult) -> None:
     if finding:
         details.add_row("Evidence", Text(finding.evidence))
     details.add_row("AI explanation" if result.explanation else "Explanation",
-                    Text(result.explanation or "AI explanation unavailable"))
+                    Text(result.explanation or ("AI explanation unavailable or rejected" if use_ai
+                                                else "AI disabled with --no-ai")))
     parts: list[object] = [details]
     if commit:
         parts.append(Text("\n" + commit.stat))
