@@ -13,13 +13,13 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from ghostdev import config
-from ghostdev.bisect import BisectResult, FAIL, PASS
-from ghostdev.doctor import CheckResult, FAIL, PASS as CHECK_PASS
-from ghostdev.exorcise import ExorcisePlan
-from ghostdev.lockfile import requirement_id
-from ghostdev.models import Finding, RunResult, Status
-from ghostdev.verify import PatchError, render_fix
+from phantom import config
+from phantom.bisect import BisectResult, FAIL, PASS
+from phantom.doctor import CheckResult, FAIL, PASS as CHECK_PASS
+from phantom.exorcise import ExorcisePlan
+from phantom.lockfile import requirement_id
+from phantom.models import Finding, RunResult, Status
+from phantom.verify import PatchError, render_fix
 
 console = Console()
 
@@ -186,7 +186,7 @@ def exorcise_plan(exorcism: ExorcisePlan) -> None:
 def exorcise_written(paths: list[Path]) -> None:
     for path in paths:
         console.print(Text(f"wrote {path}"))
-    console.print("Review the changes and commit them yourself; GhostDev never commits.")
+    console.print("Review the changes and commit them yourself; Phantom never commits.")
 
 
 def doctor_results(results: list[CheckResult]) -> None:

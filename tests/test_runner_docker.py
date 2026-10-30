@@ -4,9 +4,9 @@ import subprocess
 
 import pytest
 
-from ghostdev.models import Step
-from ghostdev.parse import extract_steps
-from ghostdev.runner import resolve_sha, run_steps
+from phantom.models import Step
+from phantom.parse import extract_steps
+from phantom.runner import resolve_sha, run_steps
 
 pytestmark = [pytest.mark.docker, pytest.mark.usefixtures('docker_available')]
 
@@ -49,9 +49,9 @@ def test_output_without_newline(demo: Path) -> None:
 
 
 def test_host_environment_not_forwarded(demo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('GHOST_TEST_SECRET', 'host-only-placeholder')
+    monkeypatch.setenv('PHANTOM_TEST_SECRET', 'host-only-placeholder')
     result = run_steps(demo, resolve_sha(demo),
-                       [Step(1, 'test -z "${GHOST_TEST_SECRET+x}"', 1)])
+                       [Step(1, 'test -z "${PHANTOM_TEST_SECRET+x}"', 1)])
     assert result.passed, result
 
 
@@ -63,6 +63,6 @@ def test_timeout_cleanup(demo: Path) -> None:
 
 
 def test_no_containers_left() -> None:
-    result = subprocess.run(['docker', 'ps', '-aq', '--filter', 'name=ghost-'],
+    result = subprocess.run(['docker', 'ps', '-aq', '--filter', 'name=phantom-'],
                             capture_output=True, text=True, check=True)
     assert not result.stdout.strip()

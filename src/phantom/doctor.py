@@ -10,7 +10,7 @@ import socket
 import subprocess
 from typing import Any
 
-from ghostdev import config, lockfile
+from phantom import config, lockfile
 
 PASS, FAIL, WARN = "pass", "fail", "warn"
 TCP_TIMEOUT = 1
@@ -114,7 +114,7 @@ def check(item: Mapping[str, Any], host: Host) -> CheckResult:
 def run_doctor(lock_path: Path, host: Host | None = None) -> list[CheckResult]:
     data = lockfile.load(lock_path)
     if data is None:
-        raise FileNotFoundError(f"No {lock_path.name} at {lock_path.parent}. "
-                                "Run `ghost exorcise` first or pass --lock.")
+        raise FileNotFoundError(f"No {lock_path.name} in {lock_path.resolve().parent}. "
+                                "Run `phantom exorcise` first or pass --lock.")
     host = host or Host.current()
     return [check(item, host) for item in data["requirements"]]

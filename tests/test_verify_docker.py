@@ -3,10 +3,10 @@ import runpy
 
 import pytest
 
-from ghostdev.models import Status
-from ghostdev.parse import committed_readme
-from ghostdev.runner import run_steps
-from ghostdev.verify import verify_readme
+from phantom.models import Status
+from phantom.parse import committed_readme
+from phantom.runner import run_steps
+from phantom.verify import verify_readme
 
 pytestmark = [pytest.mark.docker, pytest.mark.usefixtures('docker_available')]
 

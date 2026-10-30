@@ -7,10 +7,10 @@ import urllib.error
 
 import pytest
 
-from ghostdev import diagnose as diag
-from ghostdev.diagnose import AIUnavailable, diagnose, explain_commit, generate
-from ghostdev.models import Cause, ReqType, Status, Step, StepResult
-from ghostdev.rules import classify, validate_evidence
+from phantom import diagnose as diag
+from phantom.diagnose import AIUnavailable, diagnose, explain_commit, generate
+from phantom.models import Cause, ReqType, Status, Step, StepResult
+from phantom.rules import classify, validate_evidence
 
 STEPS = [Step(1, 'python app.py init', 7)]
 OUTPUT = ('Traceback (most recent call last):\n  File "/repo/app.py", line 17, in main\n'

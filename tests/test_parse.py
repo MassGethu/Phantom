@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ghostdev.parse import extract_steps, extract_steps_from_text, find_readme
+from phantom.parse import extract_steps, extract_steps_from_text, find_readme
 
 
 def test_languages_prompts_and_console_output() -> None:

@@ -1,9 +1,9 @@
-# GhostDev
+# Phantom
 
 ## Problem
 
 The most dangerous dependency in a repository isn't in requirements.txt.
-It's the one that exists only on the maintainer's laptop. GhostDev discovers
+It's the one that exists only on the maintainer's laptop. Phantom discovers
 undocumented setup assumptions that stop a new contributor's first run.
 
 Why this matters (2025 research):
@@ -27,11 +27,11 @@ repository. We do not claim a measured setup-time saving.
 
 | Stage | Command | What happens |
 |---|---|---|
-| RUN | `ghost haunt` | Runs the committed README's shell steps in a fresh Docker container |
-| NAME | `ghost haunt` | Deterministic rules name the missing requirement; a local model may explain it |
-| TRACE | `ghost bisect` | Binary search over first-parent history finds the commit that broke setup |
-| FIX | `ghost exorcise` | Patches the README, then proves the fix: it must fail before and pass after on the same commit |
-| LOCK | `ghost exorcise`, `ghost doctor` | Records verified requirements in `assumptions.lock` and checks a machine against them |
+| RUN | `phantom haunt` | Runs the committed README's shell steps in a fresh Docker container |
+| NAME | `phantom haunt` | Deterministic rules name the missing requirement; a local model may explain it |
+| TRACE | `phantom bisect` | Binary search over first-parent history finds the commit that broke setup |
+| FIX | `phantom exorcise` | Patches the README, then proves the fix: it must fail before and pass after on the same commit |
+| LOCK | `phantom exorcise`, `phantom doctor` | Records verified requirements in `assumptions.lock` and checks a machine against them |
 
 **AI explains; rules decide.** The model never runs commands, never writes shell, and
 can never mark anything verified. Only the before/after container run assigns
@@ -45,7 +45,7 @@ Requires Python 3.11+, Git, and Docker Desktop running Linux containers.
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-ghost --help
+phantom --help
 ```
 
 AI explanations are optional. Install [Ollama](https://ollama.com) and pull the model:
@@ -69,11 +69,11 @@ cd demo/haunted-todo
 **1. Haunt: run setup in a blank container** (exit 1, because a requirement is missing)
 
 ```bash
-ghost haunt --no-ai
+phantom haunt --no-ai
 ```
 
 ```text
-GhostDev
+Phantom
 ❌ step 1  python app.py init
 ╭──────────────────────────────── Setup finding ─────────────────────────────────╮
 │ Status                            hypothesis                                   │
@@ -88,7 +88,7 @@ GhostDev
 **2. Bisect: find the commit that broke setup** (exit 0 when a culprit is found)
 
 ```bash
-ghost bisect --no-ai
+phantom bisect --no-ai
 ```
 
 ```text
@@ -127,22 +127,22 @@ This is the cached rerun (0.3 s); the first run probed the same five commits in 
 **3. Exorcise: verify a README fix and write the lock**
 
 ```bash
-ghost exorcise --no-ai
+phantom exorcise --no-ai
 ```
 
 ```text
-GhostDev exorcise  54490e6
+Phantom exorcise  54490e6
 ❌ before: step 1 `python app.py init` fails
 ✅ after: every README step passes with the patch (same commit, fresh container)
  Requirement           Evidence                   Cause         Fix verified  Introduced in
  env_var DATABASE_URL  KeyError: 'DATABASE_URL'   rule_matched  ✅ alone      a124636
-+# required: DATABASE_URL (added by ghostdev)
++# required: DATABASE_URL (added by phantom)
 +export DATABASE_URL=sqlite:///./todo.db
 Apply these changes? [y/N]:
 ```
 
 Answering `N` writes nothing. Answering `y` (or passing `--apply`) writes
-`README.md` and `assumptions.lock` to the working tree. GhostDev never commits:
+`README.md` and `assumptions.lock` to the working tree. Phantom never commits:
 
 ```yaml
 requirements:
@@ -161,18 +161,18 @@ requirements:
 **4. Doctor: check your own machine against the lock** (no Docker, no AI)
 
 ```bash
-ghost doctor
+phantom doctor
 ```
 
 ```text
-GhostDev doctor
+Phantom doctor
 ❌ env.DATABASE_URL  DATABASE_URL is not set
    hint: export DATABASE_URL=sqlite:///./todo.db
 1 of 1 checks failed.
 ```
 
 ```bash
-DATABASE_URL=sqlite:///./todo.db ghost doctor
+DATABASE_URL=sqlite:///./todo.db phantom doctor
 ```
 
 That run exits 0 with `✅ env.DATABASE_URL`. To reset the demo:
@@ -189,10 +189,10 @@ about 2.5 s here, or about 5 s while the model loads on the first call.
 
 | Command | Exit 0 | Exit 1 | Exit 2 |
 |---|---|---|---|
-| `ghost haunt [PATH] [--rev HEAD] [--no-ai] [--json]` | setup passed | requirement found | infrastructure or inconclusive |
-| `ghost bisect [PATH] [--good SHA] [--bad HEAD] [--no-ai]` | culprit found | bad boundary or unreadable history | skips hide the culprit, or infrastructure |
-| `ghost exorcise [PATH] [--rev HEAD] [--apply] [--no-ai] [--copilot]` | applied, declined, or nothing to fix | no fix could be verified | dirty README, invalid lock, or inconclusive |
-| `ghost doctor [--lock assumptions.lock]` | all checks pass | a check failed | lock missing or invalid |
+| `phantom haunt [PATH] [--rev HEAD] [--no-ai] [--json]` | setup passed | requirement found | infrastructure or inconclusive |
+| `phantom bisect [PATH] [--good SHA] [--bad HEAD] [--no-ai]` | culprit found | bad boundary or unreadable history | skips hide the culprit, or infrastructure |
+| `phantom exorcise [PATH] [--rev HEAD] [--apply] [--no-ai] [--copilot]` | applied, declined, or nothing to fix | no fix could be verified | dirty README, invalid lock, or inconclusive |
+| `phantom doctor [--lock assumptions.lock]` | all checks pass | a check failed | lock missing or invalid |
 
 Errors are one-line messages, never tracebacks. Examples: Docker not running, a
 bad `--rev`, a missing README, an unreadable lock, Ollama down, or malformed model
@@ -225,7 +225,7 @@ they never block a run or change the exit code. The flagged patterns are:
 
 ### AI explanations
 
-Without `--no-ai`, GhostDev asks Ollama for schema-constrained JSON at temperature 0,
+Without `--no-ai`, Phantom asks Ollama for schema-constrained JSON at temperature 0,
 with a 20 s timeout. It uses `gemma3:4b` and falls back to `qwen2.5-coder:14b` if
 Gemma is not pulled. The output label names whichever model actually answered.
 
@@ -245,7 +245,7 @@ must be on `--bad`'s first-parent history.
 
 Infrastructure failures count as *skips*, never as broken code. If skips hide the
 culprit, the possible range is printed. Pass and fail results are cached in
-`~/.cache/ghostdev/` by commit, image digest, platform and command hash; skips are
+`~/.cache/phantom/` by commit, image digest, platform and command hash; skips are
 never cached. The model is asked once, after the search, to explain the culprit's
 diff.
 
@@ -261,7 +261,7 @@ Up to three rounds handle a later step failing next. Each fix is also re-tested
 alone; fixes that only pass together are marked `verified_together`. Requirements
 no rerun proved are listed as "needs a human" and never enter the lock. Existing
 lock entries are merged by `id`. `introduced_in` is filled from the last
-`ghost bisect` of the same requirement.
+`phantom bisect` of the same requirement.
 
 `--copilot` also proposes `.github/workflows/copilot-setup-steps.yml` for the GitHub
 Copilot coding agent. The workflow is built only from the patched README commands
@@ -284,8 +284,8 @@ Each failure prints the entry's `fix` as a hint.
 
 | Variable | Default |
 |---|---|
-| `GHOST_IMAGE` | `python:3.12-slim` |
-| `GHOST_MODEL` | `gemma3:4b` (fallback `qwen2.5-coder:14b`) |
+| `PHANTOM_IMAGE` | `python:3.12-slim` |
+| `PHANTOM_MODEL` | `gemma3:4b` (fallback `qwen2.5-coder:14b`) |
 | `OLLAMA_HOST` | `http://localhost:11434` |
 
 ## Development
@@ -329,7 +329,7 @@ Ollama. Docker tests skip when the daemon is unavailable. With Docker they cover
 ## Roadmap
 
 Not built yet:
-- `ghost ward`: a CI check that blocks PRs adding new undocumented assumptions.
+- `phantom ward`: a CI check that blocks PRs adding new undocumented assumptions.
 - Devcontainer and AGENTS.md output from verified steps.
 - Contributor personas, such as Windows or Mac setups.
 - Verified fixes for missing tools, services and versions.

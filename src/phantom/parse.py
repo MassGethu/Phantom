@@ -6,8 +6,8 @@ from pathlib import Path
 import re
 import subprocess
 
-from ghostdev import config
-from ghostdev.models import Step
+from phantom import config
+from phantom.models import Step
 
 LANGUAGES = {"", "bash", "sh", "shell", "console", "zsh"}
 

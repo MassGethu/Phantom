@@ -6,8 +6,8 @@ from typing import Any
 
 import yaml
 
-from ghostdev import __version__
-from ghostdev.models import Cause, Finding, ReqType, Status
+from phantom import __version__
+from phantom.models import Cause, Finding, ReqType, Status
 
 SCHEMA_VERSION = 1
 LOCK_NAME = "assumptions.lock"
@@ -144,7 +144,7 @@ def merge(existing: dict[str, Any] | None, image: str, platform: str,
             positions[item["id"]] = len(requirements)
             requirements.append(item)
     # NOTE: the environment records the most recent verification run.
-    data = {"schema_version": SCHEMA_VERSION, "generated_by": f"ghostdev {__version__}",
+    data = {"schema_version": SCHEMA_VERSION, "generated_by": f"phantom {__version__}",
             "environment": {"image": image, "platform": platform}, "requirements": requirements}
     validate(data)
     return data

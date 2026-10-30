@@ -6,8 +6,8 @@ import re
 import subprocess
 import uuid
 
-from ghostdev import config
-from ghostdev.models import RunResult, Step, StepResult
+from phantom import config
+from phantom.models import RunResult, Step, StepResult
 
 RunFn = Callable[[Path, str, list[Step]], RunResult]
 
@@ -53,8 +53,8 @@ def build_script(steps: list[Step]) -> str:
     lines = ["exec 2>&1", "export PYTHONUNBUFFERED=1", "cd /repo || exit 125"]
     # One bash process preserves exports, working directory and shell state between steps.
     for step in steps:
-        lines.extend([f"echo '::ghost-step {step.index}::'", step.command,
-                      f"__rc=$?; printf '\\n::ghost-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc"])
+        lines.extend([f"echo '::phantom-step {step.index}::'", step.command,
+                      f"__rc=$?; printf '\\n::phantom-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc"])
     lines.append("exit 0")
     return "\n".join(lines) + "\n"
 
@@ -65,8 +65,8 @@ def parse_output(output: str, steps: list[Step], *, timed_out: bool = False,
     results: list[StepResult] = []
     current: StepResult | None = None
     for line in output.splitlines(keepends=True):
-        start = re.fullmatch(r"::ghost-step (\d+)::\s*", line)
-        end = re.fullmatch(r"::ghost-rc (\d+) (-?\d+)::\s*", line)
+        start = re.fullmatch(r"::phantom-step (\d+)::\s*", line)
+        end = re.fullmatch(r"::phantom-rc (\d+) (-?\d+)::\s*", line)
         if start and int(start[1]) in by_index:
             current = StepResult(by_index[int(start[1])], None, "")
             results.append(current)
@@ -99,7 +99,7 @@ def error_message(error: Exception) -> str:
 
 def run_steps(repo: Path, sha: str, steps: list[Step],
               timeout: int = config.RUN_TIMEOUT) -> RunResult:
-    container = f"ghost-{uuid.uuid4().hex[:8]}"
+    container = f"phantom-{uuid.uuid4().hex[:8]}"
     result = RunResult(sha, config.IMAGE, "unknown", [], False)
     try:
         result.image = image_digest()

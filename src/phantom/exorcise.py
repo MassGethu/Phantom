@@ -5,13 +5,13 @@ import difflib
 from pathlib import Path
 from typing import Any
 
-from ghostdev import config, copilot, lockfile
-from ghostdev.bisect import load_last
-from ghostdev.diagnose import diagnose
-from ghostdev.models import Finding
-from ghostdev.parse import committed_readme, extract_steps_from_text
-from ghostdev.runner import RunFn, resolve_sha, run_steps
-from ghostdev.verify import Verification, render_fix, verify_readme
+from phantom import config, copilot, lockfile
+from phantom.bisect import load_last
+from phantom.diagnose import diagnose
+from phantom.models import Finding
+from phantom.parse import committed_readme, extract_steps_from_text
+from phantom.runner import RunFn, resolve_sha, run_steps
+from phantom.verify import Verification, render_fix, verify_readme
 
 
 class DirtyReadmeError(Exception):

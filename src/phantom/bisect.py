@@ -11,12 +11,12 @@ import subprocess
 import tempfile
 from typing import Any
 
-from ghostdev import config
-from ghostdev.diagnose import GenerateFn, explain_commit, generate
-from ghostdev.models import Finding, RunResult, Status, Step
-from ghostdev.parse import committed_readme, extract_steps_from_text, steps_hash
-from ghostdev.rules import classify, mentions
-from ghostdev.runner import (RunFn, error_message, git_output, image_digest, platform_str,
+from phantom import config
+from phantom.diagnose import GenerateFn, explain_commit, generate
+from phantom.models import Finding, RunResult, Status, Step
+from phantom.parse import committed_readme, extract_steps_from_text, steps_hash
+from phantom.rules import classify, mentions
+from phantom.runner import (RunFn, error_message, git_output, image_digest, platform_str,
                              resolve_sha, run_steps)
 
 PASS, FAIL, SKIP = "pass", "fail", "skip"

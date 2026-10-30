@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ghostdev.copilot import WORKFLOW_PATH, python_version, render_workflow
+from phantom.copilot import WORKFLOW_PATH, python_version, render_workflow
 
 COMMANDS = ['export DATABASE_URL=sqlite:///./todo.db', 'python app.py init',
             "python app.py add 'buy milk: now'", 'cat <<EOF > x.cfg\n  key: "#value"\nEOF']

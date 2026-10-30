@@ -6,10 +6,10 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from ghostdev import cli, config, exorcise, lockfile, render
-from ghostdev.bisect import run_bisect
-from ghostdev.exorcise import DirtyReadmeError
-from ghostdev.models import RunResult, Step, StepResult
+from phantom import cli, config, exorcise, lockfile, render
+from phantom.bisect import run_bisect
+from phantom.exorcise import DirtyReadmeError
+from phantom.models import RunResult, Step, StepResult
 
 
 def fake_run(repo: Path, sha: str, steps: list[Step]) -> RunResult:

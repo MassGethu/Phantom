@@ -1,6 +1,6 @@
 import json
 
-from ghostdev.models import Cause, Finding, Fix, ReqType, RunResult, Status, Step, StepResult
+from phantom.models import Cause, Finding, Fix, ReqType, RunResult, Status, Step, StepResult
 
 
 def test_run_results() -> None:

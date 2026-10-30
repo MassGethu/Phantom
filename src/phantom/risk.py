@@ -2,7 +2,7 @@
 
 import re
 
-from ghostdev.models import Step
+from phantom.models import Step
 
 SECRET_NAME = r"[A-Za-z_][A-Za-z0-9_]*(?:TOKEN|SECRET|KEY|PASSWORD)[A-Za-z0-9_]*"
 # Values that are obviously stand-ins rather than real credentials.

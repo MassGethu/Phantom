@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from ghostdev import lockfile
-from ghostdev.lockfile import LockError
-from ghostdev.models import Cause, Finding, Fix, ReqType, Status, Step, StepResult
+from phantom import lockfile
+from phantom.lockfile import LockError
+from phantom.models import Cause, Finding, Fix, ReqType, Status, Step, StepResult
 
 HASH = 'a' * 64
 
@@ -72,7 +72,7 @@ def test_dump_and_load_round_trip(tmp_path: Path) -> None:
     path = tmp_path / 'assumptions.lock'
     path.write_text(lockfile.dump(lock('A')))
     text = path.read_text()
-    assert text.startswith('schema_version: 1\ngenerated_by: ghostdev 0.1.0\n')
+    assert text.startswith('schema_version: 1\ngenerated_by: phantom 0.1.0\n')
     assert text.index('id: env.A') < text.index('type: env_var') < text.index('check:')
     assert lockfile.load(path) == lock('A')
     assert lockfile.load(tmp_path / 'missing.lock') is None

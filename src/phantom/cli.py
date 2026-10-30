@@ -5,17 +5,17 @@ import subprocess
 
 import typer
 
-from ghostdev import lockfile, render
-from ghostdev.bisect import BoundaryError, InconclusiveError, run_bisect
-from ghostdev.diagnose import diagnose
-from ghostdev.doctor import FAIL, run_doctor
-from ghostdev.exorcise import DirtyReadmeError, add_copilot, apply as exorcise_apply, plan as exorcise_plan
-from ghostdev.lockfile import LockError
-from ghostdev.models import Finding, RunResult, Status
-from ghostdev.parse import committed_readme, extract_steps_from_text
-from ghostdev.risk import flag_steps
-from ghostdev.rules import classify
-from ghostdev.runner import resolve_sha, run_steps
+from phantom import lockfile, render
+from phantom.bisect import BoundaryError, InconclusiveError, run_bisect
+from phantom.diagnose import diagnose
+from phantom.doctor import FAIL, run_doctor
+from phantom.exorcise import DirtyReadmeError, add_copilot, apply as exorcise_apply, plan as exorcise_plan
+from phantom.lockfile import LockError
+from phantom.models import Finding, RunResult, Status
+from phantom.parse import committed_readme, extract_steps_from_text
+from phantom.risk import flag_steps
+from phantom.rules import classify
+from phantom.runner import resolve_sha, run_steps
 
 app = typer.Typer(help="Find the hidden assumptions haunting repository setup.")
 AI_DISABLED = "AI disabled with --no-ai"

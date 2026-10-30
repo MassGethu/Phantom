@@ -6,13 +6,13 @@ from pathlib import Path
 import re
 import shlex
 
-from ghostdev import config
-from ghostdev.models import Finding, Fix, ReqType, RunResult, Status, Step
-from ghostdev.parse import extract_steps_from_text, steps_hash
-from ghostdev.rules import classify
-from ghostdev.runner import RunFn
+from phantom import config
+from phantom.models import Finding, Fix, ReqType, RunResult, Status, Step
+from phantom.parse import extract_steps_from_text, steps_hash
+from phantom.rules import classify
+from phantom.runner import RunFn
 
-COMMENT = "# required: {name} (added by ghostdev)"
+COMMENT = "# required: {name} (added by phantom)"
 INSERTED_LINES = 2
 ExplainFn = Callable[[Finding], Finding]
 

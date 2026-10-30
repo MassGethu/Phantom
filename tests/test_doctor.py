@@ -4,9 +4,9 @@ import socket
 import pytest
 from typer.testing import CliRunner
 
-from ghostdev import cli, doctor, lockfile
-from ghostdev.doctor import FAIL, PASS, WARN, Host, check, version_satisfies
-from ghostdev.models import Cause, Finding, Fix, ReqType, Status, Step, StepResult
+from phantom import cli, doctor, lockfile
+from phantom.doctor import FAIL, PASS, WARN, Host, check, version_satisfies
+from phantom.models import Cause, Finding, Fix, ReqType, Status, Step, StepResult
 
 HASH = 'a' * 64
 
@@ -91,7 +91,7 @@ def test_cli_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_cli_missing_or_invalid_lock_exits_2(tmp_path: Path) -> None:
     missing = CliRunner().invoke(cli.app, ['doctor', '--lock', str(tmp_path / 'none.lock')])
-    assert missing.exit_code == 2 and 'ghost exorcise' in missing.stdout
+    assert missing.exit_code == 2 and 'phantom exorcise' in missing.stdout
     (tmp_path / 'bad.lock').write_text('schema_version: 9\n')
     invalid = CliRunner().invoke(cli.app, ['doctor', '--lock', str(tmp_path / 'bad.lock')])
     assert invalid.exit_code == 2 and 'Traceback' not in invalid.stdout

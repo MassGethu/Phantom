@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from ghostdev import cli
-from ghostdev.models import Finding, RunResult, Step, StepResult
-from ghostdev.rules import classify
+from phantom import cli
+from phantom.models import Finding, RunResult, Step, StepResult
+from phantom.rules import classify
 
 runner = CliRunner()
 

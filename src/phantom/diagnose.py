@@ -9,9 +9,9 @@ from typing import Any
 import urllib.error
 import urllib.request
 
-from ghostdev import config
-from ghostdev.models import Cause, Finding, ReqType, Status, Step
-from ghostdev.rules import clean_explanation, default_fix, mentions, repo_file, validate_ai_output
+from phantom import config
+from phantom.models import Cause, Finding, ReqType, Status, Step
+from phantom.rules import clean_explanation, default_fix, mentions, repo_file, validate_ai_output
 
 TYPES = [req_type.value for req_type in ReqType]
 FINDING_SCHEMA: dict[str, Any] = {

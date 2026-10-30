@@ -3,9 +3,9 @@ import runpy
 
 import pytest
 
-from ghostdev.models import Fix, ReqType, RunResult, Status, Step, StepResult
-from ghostdev.parse import extract_steps_from_text
-from ghostdev.verify import (Candidate, PatchError, apply_fixes, original_step, patch_readme,
+from phantom.models import Fix, ReqType, RunResult, Status, Step, StepResult
+from phantom.parse import extract_steps_from_text
+from phantom.verify import (Candidate, PatchError, apply_fixes, original_step, patch_readme,
                              render_fix, verify_fix, verify_readme)
 
 README = '''# Demo
@@ -76,7 +76,7 @@ def test_patch_inserts_inside_block_before_failing_step() -> None:
     steps = extract_steps_from_text(README)
     patched = patch_readme(README, steps[0], ENV_FIX)
     lines = patched.splitlines()
-    assert lines[6:9] == ['# required: DATABASE_URL (added by ghostdev)',
+    assert lines[6:9] == ['# required: DATABASE_URL (added by phantom)',
                           'export DATABASE_URL=sqlite:///./todo.db', 'python app.py init']
     assert lines[-1] == '```'
     reparsed = extract_steps_from_text(patched)

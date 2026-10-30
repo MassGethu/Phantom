@@ -7,9 +7,9 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from ghostdev import bisect as bis, cli, config
-from ghostdev.bisect import BoundaryError, InconclusiveError, matching_hunk, run_bisect
-from ghostdev.models import RunResult, Step, StepResult
+from phantom import bisect as bis, cli, config
+from phantom.bisect import BoundaryError, InconclusiveError, matching_hunk, run_bisect
+from phantom.models import RunResult, Step, StepResult
 
 ENV = ('python@sha256:abc', 'linux/arm64')
 

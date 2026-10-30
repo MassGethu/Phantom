@@ -3,8 +3,8 @@ import runpy
 
 import pytest
 
-from ghostdev.models import Cause, ReqType, Status, Step, StepResult
-from ghostdev.rules import (classify, default_fix, safe_example_value, validate_ai_output,
+from phantom.models import Cause, ReqType, Status, Step, StepResult
+from phantom.rules import (classify, default_fix, safe_example_value, validate_ai_output,
                             validate_evidence, validate_fix, validate_version)
 
 

@@ -1,7 +1,7 @@
 import pytest
 
-from ghostdev.models import Step
-from ghostdev.risk import flag_steps, reasons
+from phantom.models import Step
+from phantom.risk import flag_steps, reasons
 
 
 @pytest.mark.parametrize(('command', 'reason'), [

@@ -9,8 +9,8 @@ import subprocess
 import tomllib
 from typing import Any
 
-from ghostdev import config
-from ghostdev.models import Cause, Finding, Fix, ReqType, Status, StepResult
+from phantom import config
+from phantom.models import Cause, Finding, Fix, ReqType, Status, StepResult
 
 INFRA_PATTERNS = (
     r"Could not resolve host", r"Temporary failure in name resolution",
