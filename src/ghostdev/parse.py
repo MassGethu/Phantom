@@ -2,7 +2,9 @@
 
 from pathlib import Path
 import re
+import subprocess
 
+from ghostdev import config
 from ghostdev.models import Step
 
 LANGUAGES = {"", "bash", "sh", "shell", "console", "zsh"}
@@ -14,6 +16,18 @@ def find_readme(repo: Path) -> Path:
     if not matches:
         raise FileNotFoundError("No README.md found at the repository root.")
     return matches[0]
+
+
+def committed_readme(repo: Path, sha: str) -> tuple[str, str]:
+    """Return (filename, text) of the README committed at sha, matching the copied source."""
+    listing = subprocess.run(["git", "-C", str(repo), "ls-tree", "--name-only", sha],
+                             capture_output=True, text=True, check=True, timeout=config.GIT_TIMEOUT)
+    names = sorted(name for name in listing.stdout.splitlines() if name.lower() == "readme.md")
+    if not names:
+        raise FileNotFoundError("No README.md is committed at the repository root.")
+    shown = subprocess.run(["git", "-C", str(repo), "show", f"{sha}:{names[0]}"],
+                           capture_output=True, text=True, check=True, timeout=config.GIT_TIMEOUT)
+    return names[0], shown.stdout
 
 
 def extract_steps(repo: Path) -> list[Step]:

@@ -17,6 +17,8 @@ INFRA_PATTERNS = (
     r"Connection timed out", r"pull access denied", r"\bTLS\b",
     r"SSL: CERTIFICATE", r"CERTIFICATE_VERIFY_FAILED", r"No space left on device",
 )
+MIN_EVIDENCE_CHARS = 4
+MAX_EXPLANATION_SENTENCES = 2
 SECRET_PATTERN = re.compile(
     r"sk-[\w-]+|ghp_[\w]+|AKIA[\w]+|xox[bp]-[\w-]+|-----BEGIN|[A-Za-z0-9+/=_-]{33,}"
 )
@@ -28,7 +30,7 @@ def safe_example_value(value: str | None) -> str:
     return value
 
 
-def _repo_file(repo: Path, sha: str, name: str) -> str | None:
+def repo_file(repo: Path, sha: str, name: str) -> str | None:
     result = subprocess.run(["git", "-C", str(repo), "show", f"{sha}:{name}"],
                             capture_output=True, text=True, timeout=config.GIT_TIMEOUT)
     if result.returncode:
@@ -45,7 +47,7 @@ def default_fix(req_type: ReqType, name: str, repo: Path | None = None,
         value = "changeme"
         if repo is not None and sha is not None:
             for filename in (".env.example", ".env.sample", "example.env"):
-                text = _repo_file(repo, sha, filename)
+                text = repo_file(repo, sha, filename)
                 if text is None:
                     continue
                 match = re.search(r"^\s*(?:export\s+)?" + re.escape(name) + r"\s*=\s*(.*?)\s*$", text, re.M)
@@ -54,7 +56,7 @@ def default_fix(req_type: ReqType, name: str, repo: Path | None = None,
                     break
         return Fix(req_type, name, safe_example_value(value))
     if req_type == ReqType.FILE and repo is not None and sha is not None:
-        if _repo_file(repo, sha, f"{name}.example") is not None:
+        if repo_file(repo, sha, f"{name}.example") is not None:
             return Fix(req_type, name)
     return None
 
@@ -101,10 +103,30 @@ def classify(result: StepResult, repo: Path | None = None, sha: str | None = Non
     return Finding(result, Status.OBSERVED, ReqType.UNKNOWN, None, evidence, Cause.NONE)
 
 
+def mentions(name: str, text: str) -> bool:
+    """True when name appears as a whole identifier, not inside a longer word."""
+    return bool(name) and re.search(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", text) is not None
+
+
 def validate_evidence(payload: Mapping[str, Any], result: StepResult) -> bool:
+    """R2: the evidence must be a real fragment of one output line that names the requirement."""
     evidence, name = payload.get("evidence_line"), payload.get("name")
-    return (isinstance(evidence, str) and bool(evidence.strip()) and evidence in result.output
-            and isinstance(name, str) and bool(name.strip()) and name in result.output)
+    if not isinstance(evidence, str) or not isinstance(name, str):
+        return False
+    evidence, name = evidence.strip(), name.strip()
+    if len(evidence) < MIN_EVIDENCE_CHARS or "\n" in evidence:
+        return False
+    return (any(evidence in line for line in result.output.splitlines())
+            and mentions(name, evidence))
+
+
+def clean_explanation(text: Any) -> str | None:
+    """Keep at most two sentences of plain model prose; anything else is dropped."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    sentences = re.split(r"(?<=[.!?])\s+", " ".join(text.split()))
+    short = " ".join(sentences[:MAX_EXPLANATION_SENTENCES])
+    return short if len(short) <= config.MAX_EXPLANATION_CHARS else None
 
 
 def validate_version(name: str, repo_files: Mapping[str, str]) -> bool:
@@ -153,6 +175,9 @@ def validate_ai_output(payload: Any, finding: Finding,
                        repo_files: Mapping[str, str] | None = None) -> Finding:
     """Return a copy; a model can never assign verified status or override a rule."""
     supported = isinstance(payload, dict) and validate_evidence(payload, finding.step)
+    if supported:
+        payload = {**payload, "name": payload["name"].strip(),
+                   "evidence_line": payload["evidence_line"].strip()}
     try:
         req_type = ReqType(payload.get("type")) if isinstance(payload, dict) else ReqType.UNKNOWN
     except (TypeError, ValueError):
@@ -166,8 +191,8 @@ def validate_ai_output(payload: Any, finding: Finding,
         return replace(finding, explanation=None)
     if not supported:
         return replace(finding, status=Status.UNSUPPORTED, explanation=None, fix=None)
-    explanation = payload.get("explanation")
-    if not isinstance(explanation, str) or not explanation.strip():
+    explanation = clean_explanation(payload.get("explanation"))
+    if explanation is None:
         return replace(finding, explanation=None)
     fix = validate_fix(payload.get("fix"))
     if fix and (fix.type != req_type or fix.name != payload["name"]):

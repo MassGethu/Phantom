@@ -39,9 +39,17 @@ def suggested_fix(finding: Finding) -> str | None:
     return None
 
 
-def haunt_result(result: RunResult, finding: Finding | None, json_output: bool = False) -> None:
+def explanation_label(ai_note: str | None) -> str:
+    """Name the model honestly: the fallback model is not Gemma."""
+    model = (ai_note or "").removeprefix("explained by ")
+    return "Gemma explanation" if model.startswith("gemma") else f"AI explanation ({model or 'model'})"
+
+
+def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None = None,
+                 json_output: bool = False) -> None:
     if json_output:
-        print(json.dumps({"run": asdict(result), "finding": finding.to_dict() if finding else None}))
+        print(json.dumps({"run": asdict(result), "finding": finding.to_dict() if finding else None,
+                          "ai_note": ai_note}))
         return
     console.print(Text(config.APP_NAME, style="bold"))
     for step in result.steps:
@@ -64,9 +72,9 @@ def haunt_result(result: RunResult, finding: Finding | None, json_output: bool =
     details.add_row("Evidence", Text(finding.evidence or "No output captured."))
     details.add_row("Cause", Text(finding.cause.value))
     if finding.explanation:
-        details.add_row("Gemma explanation", Text(finding.explanation))
+        details.add_row(explanation_label(ai_note), Text(finding.explanation))
     else:
-        details.add_row("Explanation", "AI explanation unavailable")
+        details.add_row("Explanation", Text(ai_note or "AI explanation unavailable"))
     command = suggested_fix(finding)
     if command:
         details.add_row("Suggested fix (not yet verified)", Text(command))

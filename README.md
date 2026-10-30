@@ -58,8 +58,13 @@ revision. Uncommitted changes are excluded. Clone boilerplate is skipped because
 the repository is already copied to `/repo`. The runner records the resolved
 image digest and platform (Linux ARM64 on Apple Silicon).
 
+Without `--no-ai`, haunt asks a local model through Ollama (`gemma3:4b`, falling
+back to `qwen2.5-coder:14b` when Gemma is not pulled) to explain the finding. The
+answer is schema-constrained JSON and is kept only when its evidence line appears in
+the step output and it names the same requirement as the rule. When Ollama is
+unreachable, haunt still shows the rule finding and says why no explanation appears.
+
 `bisect`, `exorcise`, and `doctor` currently print `not implemented yet`.
-No AI calls are made in this phase, with or without `--no-ai`.
 
 ### Development and handoff
 
