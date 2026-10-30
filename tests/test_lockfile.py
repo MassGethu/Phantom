@@ -79,3 +79,14 @@ def test_dump_and_load_round_trip(tmp_path: Path) -> None:
     path.write_text('requirements: [unclosed')
     with pytest.raises(LockError, match='Cannot read'):
         lockfile.load(path)
+
+
+def test_unreadable_locks_raise_lock_error_with_one_line(tmp_path: Path) -> None:
+    path = tmp_path / 'assumptions.lock'
+    path.write_bytes(b'\xff\xfe\x00bad')
+    with pytest.raises(LockError, match='Cannot read'):
+        lockfile.load(path)
+    path.write_text('# title\n```bash\nls\n```\n')
+    with pytest.raises(LockError, match='line 2') as raised:
+        lockfile.load(path)
+    assert '\n' not in str(raised.value)

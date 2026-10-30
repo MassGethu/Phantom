@@ -111,14 +111,23 @@ def validate(data: Any) -> None:
         raise LockError("Invalid assumptions.lock: " + "; ".join(errors))
 
 
+def _yaml_problem(error: yaml.YAMLError) -> str:
+    """One line instead of PyYAML's multi-line excerpt."""
+    problem = getattr(error, "problem", None) or "invalid YAML"
+    mark = getattr(error, "problem_mark", None)
+    return f"{problem} at line {mark.line + 1}" if mark else problem
+
+
 def load(path: Path) -> dict[str, Any] | None:
     """Return the validated lock, None when absent; raise LockError when unusable."""
     if not path.exists():
         return None
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as error:
+    except (OSError, UnicodeDecodeError) as error:
         raise LockError(f"Cannot read {path}: {error}") from error
+    except yaml.YAMLError as error:
+        raise LockError(f"Cannot read {path}: {_yaml_problem(error)}") from error
     validate(data)
     return data
 

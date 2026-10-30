@@ -205,3 +205,29 @@ def test_generate_failures_become_unavailable(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(diag.urllib.request, 'urlopen', urlopen)
     with pytest.raises(AIUnavailable, match=message):
         generate('prompt', diag.FINDING_SCHEMA)
+
+
+MALFORMED = [
+    {}, [], 42, 'null', {'type': None}, {'type': ['env_var']}, answer(name=5), answer(name=None),
+    answer(evidence_line=['x']), answer(evidence_line=None), answer(explanation=7),
+    answer(explanation=['a']), answer(fix='export X=1'), answer(fix={'type': 9}),
+    answer(fix={'type': 'env_var', 'name': ['x']}), answer(fix=[]), answer(type='verified_fix'),
+]
+
+
+@pytest.mark.parametrize('payload', MALFORMED)
+def test_malformed_model_output_never_raises_or_verifies(demo: tuple[Path, str], payload: Any) -> None:
+    repo, sha = demo
+    unmatched = StepResult(STEPS[0], 1, 'boot failed\nconfig FOO_BAR missing\n')
+    for finding in (classify(failing(), repo, sha), classify(unmatched, repo, sha)):
+        result, note = diagnose(finding, STEPS, repo, sha, fake(payload))
+        assert result.status not in (Status.VERIFIED_FIX, Status.VERIFIED_TOGETHER)
+        assert isinstance(note, str)
+
+
+@pytest.mark.parametrize('payload', MALFORMED + [{'identifier': 'DATABASE_URL', 'explanation': 3},
+                                                 {'identifier': ['DATABASE_URL']}])
+def test_malformed_commit_explanation_is_dropped(payload: Any) -> None:
+    finding = classify(failing())
+    diff = "+    url = os.environ['DATABASE_URL']\n"
+    assert explain_commit(diff, finding, fake(payload)) is None

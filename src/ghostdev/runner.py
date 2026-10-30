@@ -90,7 +90,8 @@ def error_message(error: Exception) -> str:
     if isinstance(error, subprocess.CalledProcessError):
         detail = _decode(error.stderr or error.stdout).strip()
         if any(text in detail.lower() for text in
-               ("docker.sock", "cannot connect to the docker daemon", "is the docker daemon running")):
+               ("docker.sock", "cannot connect to the docker daemon", "is the docker daemon running",
+                "failed to connect to the docker api", "the daemon is running")):
             return "Docker isn't running. Start Docker Desktop and retry."
         return f"Container preparation failed: {detail.splitlines()[-1] if detail else 'command failed'}"
     return str(error)

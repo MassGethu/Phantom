@@ -175,3 +175,22 @@ def test_cli_exit_codes(monkeypatch: pytest.MonkeyPatch, generated: tuple[Path, 
     assert bad_good.exit_code == 1 and 'pick an older --good' in bad_good.stdout
     unknown = runner.invoke(cli.app, ['bisect', str(repo), '--good', 'nope'])
     assert unknown.exit_code == 1 and 'Traceback' not in unknown.stdout
+
+
+def test_cli_ambiguous_and_skipped_boundary_exit_2(monkeypatch: pytest.MonkeyPatch,
+                                                   generated: tuple[Path, list[str]]) -> None:
+    repo, shas = generated
+    skips: set[int] = {2, 3}
+
+    def fake(path: Path, good: str | None, bad: str, **kwargs: Any) -> bis.BisectResult:
+        return run_bisect(path, good, bad, run=FakeRunner(shas, skip=skips), env=lambda: ENV,
+                          use_ai=False, on_probe=kwargs['on_probe'])
+
+    monkeypatch.setattr(cli, 'run_bisect', fake)
+    ambiguous = CliRunner().invoke(cli.app, ['bisect', str(repo), '--good', shas[1], '--no-ai'])
+    assert ambiguous.exit_code == 2, ambiguous.stdout
+    assert shas[2][:7] in ambiguous.stdout and 'Traceback' not in ambiguous.stdout
+    skips.clear()
+    skips.add(0)  # the first run never probed shas[0], so nothing is cached for it
+    boundary = CliRunner().invoke(cli.app, ['bisect', str(repo), '--no-ai'])
+    assert boundary.exit_code == 2 and 'Traceback' not in boundary.stdout

@@ -1,5 +1,7 @@
+import subprocess
+
 from ghostdev.models import Step
-from ghostdev.runner import build_script, parse_output
+from ghostdev.runner import build_script, error_message, parse_output
 
 
 def test_marker_parsing() -> None:
@@ -16,3 +18,10 @@ def test_timeout_and_shell_exit() -> None:
     assert results[0].output == 'partial'
     assert parse_output('::ghost-step 1::\n', steps, process_code=3)[0].exit_code == 3
     assert build_script(steps).endswith('exit 0\n')
+
+
+def test_unreachable_docker_gets_a_friendly_message() -> None:
+    error = subprocess.CalledProcessError(1, ['docker'], stderr=(
+        b'failed to connect to the docker API at unix:///x.sock; check if the path is correct '
+        b'and if the daemon is running: dial unix /x.sock: connect: no such file or directory'))
+    assert error_message(error) == "Docker isn't running. Start Docker Desktop and retry."
