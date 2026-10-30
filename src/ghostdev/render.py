@@ -7,18 +7,22 @@ import shlex
 from typing import ContextManager
 
 from rich.console import Console
+from rich.console import Group
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
 from ghostdev import config
+from ghostdev.bisect import BisectResult, FAIL, PASS
 from ghostdev.models import Finding, ReqType, RunResult
 
 console = Console()
 
 
-def running(json_output: bool) -> ContextManager[object]:
-    return nullcontext() if json_output else console.status("Running README setup in a fresh container…")
+def running(json_output: bool,
+            message: str = "Running README setup in a fresh container…") -> ContextManager[object]:
+    return nullcontext() if json_output else console.status(message)
 
 
 def error(message: str, json_output: bool = False) -> None:
@@ -79,6 +83,44 @@ def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None
     if command:
         details.add_row("Suggested fix (not yet verified)", Text(command))
     console.print(Panel(details, title="Setup finding"))
+
+
+def bisect_probe(sha: str, verdict: str, cached: bool) -> None:
+    icon = {PASS: "✅", FAIL: "❌"}.get(verdict, "⚠️ ")
+    suffix = " (cached)" if cached else ""
+    label = "skipped: infrastructure" if verdict not in (PASS, FAIL) else verdict
+    console.print(Text(f"{icon} {sha[:7]}  {label}{suffix}"))
+
+
+def bisect_result(result: BisectResult) -> None:
+    if result.cache_note:
+        console.print(Text(result.cache_note, style="yellow"))
+    finding = result.finding
+    requirement = f"{finding.req_type.value} / {finding.name or 'unknown'}" if finding else "unknown"
+    if result.culprit is None:
+        suspects = ", ".join(sha[:7] for sha in result.suspects)
+        error(f"Skipped commits hide the culprit. It is one of: {suspects}.")
+        return
+    commit = result.commit
+    details = Table.grid(padding=(0, 2))
+    details.add_column(style="bold")
+    details.add_column()
+    details.add_row("Commit", Text(commit.sha[:7] if commit else result.culprit[:7]))
+    if commit:
+        details.add_row("Author", Text(commit.author))
+        details.add_row("Date", Text(commit.date))
+        details.add_row("Subject", Text(commit.subject))
+    details.add_row("Requirement", Text(requirement))
+    if finding:
+        details.add_row("Evidence", Text(finding.evidence))
+    details.add_row("AI explanation" if result.explanation else "Explanation",
+                    Text(result.explanation or "AI explanation unavailable"))
+    parts: list[object] = [details]
+    if commit:
+        parts.append(Text("\n" + commit.stat))
+    if commit and commit.hunk:
+        parts.append(Syntax(commit.hunk, "diff", theme="ansi_dark", background_color="default"))
+    console.print(Panel(Group(*parts), title="First bad commit"))
 
 
 def not_implemented() -> None:

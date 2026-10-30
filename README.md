@@ -64,7 +64,16 @@ answer is schema-constrained JSON and is kept only when its evidence line appear
 the step output and it names the same requirement as the rule. When Ollama is
 unreachable, haunt still shows the rule finding and says why no explanation appears.
 
-`bisect`, `exorcise`, and `doctor` currently print `not implemented yet`.
+`ghost bisect [PATH] [--good SHA] [--bad HEAD] [--no-ai]` parses HEAD's README
+once and runs those same commands against older commits in fresh containers, using
+a first-parent binary search. `--good` must pass and `--bad` must fail, or bisect
+exits 1 with a message. Infrastructure failures are skipped, never counted as
+broken code; if skips hide the culprit, the possible range is reported (exit 2).
+Results are cached in `~/.cache/ghostdev/results.json` by commit, image digest,
+platform and command hash, so a rerun is instant. The model is asked once, after
+the search, to explain the culprit's diff. On the demo the culprit is commit four.
+
+`exorcise` and `doctor` currently print `not implemented yet`.
 
 ### Development and handoff
 

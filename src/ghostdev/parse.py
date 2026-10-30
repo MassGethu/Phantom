@@ -1,5 +1,7 @@
 """Deterministic extraction of fenced README shell commands."""
 
+import hashlib
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -81,3 +83,8 @@ def extract_steps_from_text(readme_text: str) -> list[Step]:
         after_clone = False
         steps.append(Step(len(steps) + 1, command, source_line))
     return steps
+
+
+def steps_hash(steps: list[Step]) -> str:
+    """Identify the exact commands a run executed, for caches and the lock file."""
+    return hashlib.sha256(json.dumps([step.command for step in steps]).encode()).hexdigest()

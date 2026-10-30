@@ -1,6 +1,5 @@
 from pathlib import Path
 import runpy
-import shutil
 import subprocess
 
 import pytest
@@ -9,19 +8,7 @@ from ghostdev.models import Step
 from ghostdev.parse import extract_steps
 from ghostdev.runner import resolve_sha, run_steps
 
-pytestmark = pytest.mark.docker
-
-
-@pytest.fixture(scope='module', autouse=True)
-def docker_available() -> None:
-    if not shutil.which('docker'):
-        pytest.skip('Docker executable unavailable')
-    try:
-        check = subprocess.run(['docker', 'info'], capture_output=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired):
-        pytest.skip('Docker daemon unavailable')
-    if check.returncode:
-        pytest.skip('Docker daemon unavailable')
+pytestmark = [pytest.mark.docker, pytest.mark.usefixtures('docker_available')]
 
 
 @pytest.fixture(scope='module')

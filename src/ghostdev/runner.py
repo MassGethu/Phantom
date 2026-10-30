@@ -23,10 +23,13 @@ def _decode(data: bytes | str | None) -> str:
     return data or ""
 
 
+def git_output(repo: Path, *args: str) -> str:
+    """Run a read-only Git query against the target repository."""
+    return _decode(_command(["git", "-C", str(repo), *args], timeout=config.GIT_TIMEOUT).stdout)
+
+
 def resolve_sha(repo: Path, rev: str = "HEAD") -> str:
-    return _decode(_command(["git", "-C", str(repo), "rev-parse", "--verify",
-                             "--end-of-options", f"{rev}^{{commit}}"],
-                            timeout=config.GIT_TIMEOUT).stdout).strip()
+    return git_output(repo, "rev-parse", "--verify", "--end-of-options", f"{rev}^{{commit}}").strip()
 
 
 def image_digest() -> str:
@@ -79,7 +82,7 @@ def parse_output(output: str, steps: list[Step], *, timed_out: bool = False,
     return results
 
 
-def _error_message(error: Exception) -> str:
+def error_message(error: Exception) -> str:
     if isinstance(error, FileNotFoundError):
         return "Docker or Git is not installed. Install both and retry."
     if isinstance(error, subprocess.TimeoutExpired):
@@ -122,7 +125,7 @@ def run_steps(repo: Path, sha: str, steps: list[Step],
             if not result.steps:
                 result.infra_error = "Container execution timed out before any setup step started."
     except (OSError, subprocess.SubprocessError, ValueError) as error:
-        result.infra_error = _error_message(error)
+        result.infra_error = error_message(error)
     finally:
         try:
             cleanup = subprocess.run(["docker", "rm", "-f", container], capture_output=True,
@@ -131,6 +134,6 @@ def run_steps(repo: Path, sha: str, steps: list[Step],
                 result.infra_error = result.infra_error or "Container cleanup failed. Check Docker Desktop."
                 result.passed = False
         except (OSError, subprocess.SubprocessError) as error:
-            result.infra_error = result.infra_error or _error_message(error)
+            result.infra_error = result.infra_error or error_message(error)
             result.passed = False
     return result

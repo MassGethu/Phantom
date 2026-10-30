@@ -1,6 +1,7 @@
 """Shared defaults; configuration never forwards host environment to Docker."""
 
 import os
+from pathlib import Path
 
 APP_NAME = "GhostDev"
 IMAGE = os.environ.get("GHOST_IMAGE", "python:3.12-slim")
@@ -15,3 +16,4 @@ MAX_ROUNDS = 3
 OUTPUT_TAIL_LINES = 60
 MAX_EXPLANATION_CHARS = 400
 MAX_DIFF_CHARS = 6000
+CACHE_DIR = Path.home() / ".cache" / "ghostdev"

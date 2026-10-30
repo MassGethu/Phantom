@@ -6,6 +6,7 @@ import subprocess
 import typer
 
 from ghostdev import render
+from ghostdev.bisect import BoundaryError, InconclusiveError, run_bisect
 from ghostdev.diagnose import diagnose
 from ghostdev.models import Finding, RunResult, Status
 from ghostdev.parse import committed_readme, extract_steps_from_text
@@ -64,9 +65,29 @@ def haunt(
 
 
 @app.command()
-def bisect() -> None:
-    """Find the first broken commit (planned for phase two)."""
-    render.not_implemented()
+def bisect(
+    path: Path = typer.Argument(Path("."), help="Repository containing README.md."),
+    good: str | None = typer.Option(None, help="Known-good commit (default: oldest first-parent commit)."),
+    bad: str = typer.Option("HEAD", help="Known-bad commit."),
+    no_ai: bool = typer.Option(False, "--no-ai", help="Skip the final AI explanation."),
+) -> None:
+    """Find the first commit whose code breaks today's README setup."""
+    try:
+        with render.running(False, "Testing commits in fresh containers…"):
+            result = run_bisect(path, good, bad, use_ai=not no_ai, on_probe=render.bisect_probe)
+    except (BoundaryError, subprocess.CalledProcessError) as error:
+        message = str(error) if isinstance(error, BoundaryError) else (
+            "Cannot read the Git history. Check the path, --good and --bad.")
+        render.error(message)
+        raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        render.error("Reading the repository timed out. Check the repository and retry.")
+        raise typer.Exit(2)
+    except (InconclusiveError, OSError, ValueError) as error:
+        render.error(str(error))
+        raise typer.Exit(2)
+    render.bisect_result(result)
+    raise typer.Exit(0 if result.culprit else 2)
 
 
 @app.command()
