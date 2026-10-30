@@ -51,7 +51,7 @@ def build_script(steps: list[Step]) -> str:
     # One bash process preserves exports, working directory and shell state between steps.
     for step in steps:
         lines.extend([f"echo '::ghost-step {step.index}::'", step.command,
-                      f"__rc=$?; echo \"::ghost-rc {step.index} $__rc::\"; [ $__rc -ne 0 ] && exit $__rc"])
+                      f"__rc=$?; printf '\\n::ghost-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc"])
     lines.append("exit 0")
     return "\n".join(lines) + "\n"
 

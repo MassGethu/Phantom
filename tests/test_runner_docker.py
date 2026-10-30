@@ -55,6 +55,19 @@ def test_single_shell_session(demo: Path) -> None:
     assert result.passed, result
 
 
+def test_output_without_newline(demo: Path) -> None:
+    result = run_steps(demo, resolve_sha(demo), [Step(1, 'printf hello', 1)])
+    assert result.passed, result
+    assert result.steps[0].output.strip() == 'hello'
+
+
+def test_host_environment_not_forwarded(demo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('GHOST_TEST_SECRET', 'host-only-placeholder')
+    result = run_steps(demo, resolve_sha(demo),
+                       [Step(1, 'test -z "${GHOST_TEST_SECRET+x}"', 1)])
+    assert result.passed, result
+
+
 def test_timeout_cleanup(demo: Path) -> None:
     result = run_steps(demo, resolve_sha(demo), [Step(1, 'echo ready; sleep 30', 1)], timeout=1)
     assert result.first_failure.timed_out
