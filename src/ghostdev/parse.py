@@ -27,9 +27,10 @@ def committed_readme(repo: Path, sha: str) -> tuple[str, str]:
     names = sorted(name for name in listing.stdout.splitlines() if name.lower() == "readme.md")
     if not names:
         raise FileNotFoundError("No README.md is committed at the repository root.")
+    # Bytes, not text mode, so CRLF line endings survive a later README patch.
     shown = subprocess.run(["git", "-C", str(repo), "show", f"{sha}:{names[0]}"],
-                           capture_output=True, text=True, check=True, timeout=config.GIT_TIMEOUT)
-    return names[0], shown.stdout
+                           capture_output=True, check=True, timeout=config.GIT_TIMEOUT)
+    return names[0], shown.stdout.decode("utf-8")
 
 
 def extract_steps(repo: Path) -> list[Step]:

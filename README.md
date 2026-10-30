@@ -73,7 +73,18 @@ Results are cached in `~/.cache/ghostdev/results.json` by commit, image digest,
 platform and command hash, so a rerun is instant. The model is asked once, after
 the search, to explain the culprit's diff. On the demo the culprit is commit four.
 
-`exorcise` and `doctor` currently print `not implemented yet`.
+`ghost exorcise [PATH] [--rev HEAD] [--apply] [--no-ai]` refuses to run when the
+working-tree README differs from the committed one. It runs the original README
+(must fail), inserts a fixed-template command such as
+`export DATABASE_URL=sqlite:///./todo.db` directly before the failing line, re-parses
+the patched README and runs it on the same commit in a new container (must pass).
+Up to three rounds handle a later step failing next; fixes that only pass together
+are marked `verified_together`. It shows the diff and asks `Apply these changes?
+[y/N]` unless `--apply` is given, then writes `README.md` and `assumptions.lock`.
+It never commits. Requirements no rerun proved are listed as "needs a human" and
+never enter the lock.
+
+`doctor` currently prints `not implemented yet`.
 
 ### Development and handoff
 

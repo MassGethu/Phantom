@@ -8,6 +8,8 @@ import typer
 from ghostdev import render
 from ghostdev.bisect import BoundaryError, InconclusiveError, run_bisect
 from ghostdev.diagnose import diagnose
+from ghostdev.exorcise import DirtyReadmeError, apply as exorcise_apply, plan as exorcise_plan
+from ghostdev.lockfile import LockError
 from ghostdev.models import Finding, RunResult, Status
 from ghostdev.parse import committed_readme, extract_steps_from_text
 from ghostdev.rules import classify
@@ -91,9 +93,42 @@ def bisect(
 
 
 @app.command()
-def exorcise() -> None:
-    """Verify and apply documentation fixes (planned for phase two)."""
-    render.not_implemented()
+def exorcise(
+    path: Path = typer.Argument(Path("."), help="Repository containing README.md."),
+    rev: str = typer.Option("HEAD", help="Committed revision to verify against."),
+    apply: bool = typer.Option(False, "--apply", help="Write changes without asking."),
+    no_ai: bool = typer.Option(False, "--no-ai", help="Use deterministic rules only."),
+) -> None:
+    """Verify a README-only fix in fresh containers, then write README.md and assumptions.lock."""
+    try:
+        with render.running(False, "Verifying README fixes in fresh containers…"):
+            exorcism = exorcise_plan(path, rev, use_ai=not no_ai)
+    except subprocess.CalledProcessError:
+        render.error("Cannot read the Git revision or committed README. Check the path and --rev.")
+        raise typer.Exit(2)
+    except subprocess.TimeoutExpired:
+        render.error("Reading the repository timed out. Check the repository and retry.")
+        raise typer.Exit(2)
+    except (DirtyReadmeError, LockError, OSError, ValueError) as error:
+        render.error(str(error))
+        raise typer.Exit(2)
+    render.exorcise_plan(exorcism)
+    verification = exorcism.verification
+    if verification.inconclusive:
+        raise typer.Exit(2)
+    if verification.nothing_to_fix:
+        raise typer.Exit(0)
+    if not verification.verified:
+        raise typer.Exit(1)
+    if not apply and not typer.confirm("Apply these changes?", default=False):
+        render.info("No files changed.")
+        raise typer.Exit(0)
+    try:
+        written = exorcise_apply(exorcism)
+    except (DirtyReadmeError, OSError) as error:
+        render.error(str(error))
+        raise typer.Exit(2)
+    render.exorcise_written(written)
 
 
 @app.command()

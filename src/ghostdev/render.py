@@ -3,6 +3,7 @@
 from contextlib import nullcontext
 from dataclasses import asdict
 import json
+from pathlib import Path
 from typing import ContextManager
 
 from rich.console import Console
@@ -14,7 +15,9 @@ from rich.text import Text
 
 from ghostdev import config
 from ghostdev.bisect import BisectResult, FAIL, PASS
-from ghostdev.models import Finding, RunResult
+from ghostdev.exorcise import ExorcisePlan
+from ghostdev.lockfile import requirement_id
+from ghostdev.models import Finding, RunResult, Status
 from ghostdev.verify import PatchError, render_fix
 
 console = Console()
@@ -119,6 +122,53 @@ def bisect_result(result: BisectResult) -> None:
     if commit and commit.hunk:
         parts.append(Syntax(commit.hunk, "diff", theme="ansi_dark", background_color="default"))
     console.print(Panel(Group(*parts), title="First bad commit"))
+
+
+def info(message: str) -> None:
+    console.print(Text(message))
+
+
+def _requirement(finding: Finding) -> str:
+    return f"{finding.req_type.value} {finding.name or 'unknown'}"
+
+
+def exorcise_plan(exorcism: ExorcisePlan) -> None:
+    verification = exorcism.verification
+    console.print(Text(f"{config.APP_NAME} exorcise  {exorcism.sha[:7]}", style="bold"))
+    before = verification.before.first_failure
+    if verification.nothing_to_fix:
+        console.print("The committed README already passes in a fresh container. Nothing to fix.",
+                      style="green")
+        return
+    if before:
+        console.print(Text(f"❌ before: step {before.step.index} `{before.step.command}` fails"))
+    if verification.verified and verification.after:
+        console.print(Text("✅ after: every README step passes with the patch (same commit, fresh container)"))
+    if verification.inconclusive:
+        error(verification.inconclusive)
+    table = Table(title="Requirements")
+    for column in ("Requirement", "Evidence", "Cause", "Fix verified", "Introduced in"):
+        table.add_column(column, overflow="fold")
+    for finding in verification.verified:
+        label = "✅ alone" if finding.status == Status.VERIFIED_FIX else "✅ with the other fixes"
+        introduced = exorcism.introduced_in.get(requirement_id(finding.req_type, finding.name)) if finding.name else None
+        table.add_row(Text(_requirement(finding)), Text(finding.evidence), finding.cause.value,
+                      label, introduced or "not traced")
+    for finding in verification.unverified:
+        table.add_row(Text(_requirement(finding)), Text(finding.evidence), finding.cause.value,
+                      "❌ needs a human", "—")
+    if verification.verified or verification.unverified:
+        console.print(table)
+    if exorcism.diff:
+        console.print(Syntax(exorcism.diff, "diff", theme="ansi_dark", background_color="default"))
+    if verification.unverified and not verification.verified:
+        console.print("No fix was verified, so no files will be written.", style="yellow")
+
+
+def exorcise_written(paths: list[Path]) -> None:
+    for path in paths:
+        console.print(Text(f"wrote {path}"))
+    console.print("Review the changes and commit them yourself; GhostDev never commits.")
 
 
 def not_implemented() -> None:
