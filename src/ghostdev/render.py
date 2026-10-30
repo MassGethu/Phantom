@@ -3,7 +3,6 @@
 from contextlib import nullcontext
 from dataclasses import asdict
 import json
-import shlex
 from typing import ContextManager
 
 from rich.console import Console
@@ -15,7 +14,8 @@ from rich.text import Text
 
 from ghostdev import config
 from ghostdev.bisect import BisectResult, FAIL, PASS
-from ghostdev.models import Finding, ReqType, RunResult
+from ghostdev.models import Finding, RunResult
+from ghostdev.verify import PatchError, render_fix
 
 console = Console()
 
@@ -33,14 +33,12 @@ def error(message: str, json_output: bool = False) -> None:
 
 
 def suggested_fix(finding: Finding) -> str | None:
-    fix = finding.fix
-    if fix is None:
+    if finding.fix is None:
         return None
-    if fix.type == ReqType.ENV_VAR:
-        return f"export {fix.name}={shlex.quote(fix.example_value or 'changeme')}"
-    if fix.type == ReqType.FILE:
-        return f"cp {shlex.quote(fix.name + '.example')} {shlex.quote(fix.name)}"
-    return None
+    try:
+        return render_fix(finding.fix)
+    except PatchError:
+        return None
 
 
 def explanation_label(ai_note: str | None) -> str:
