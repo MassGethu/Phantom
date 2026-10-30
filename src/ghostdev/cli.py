@@ -13,6 +13,7 @@ from ghostdev.exorcise import DirtyReadmeError, apply as exorcise_apply, plan as
 from ghostdev.lockfile import LockError
 from ghostdev.models import Finding, RunResult, Status
 from ghostdev.parse import committed_readme, extract_steps_from_text
+from ghostdev.risk import flag_steps
 from ghostdev.rules import classify
 from ghostdev.runner import resolve_sha, run_steps
 
@@ -20,7 +21,10 @@ app = typer.Typer(help="Find the hidden assumptions haunting repository setup.")
 AI_DISABLED = "AI disabled with --no-ai"
 
 
-def _haunt(path: Path, rev: str, use_ai: bool) -> tuple[RunResult, Finding | None, str | None]:
+HauntOutcome = tuple[RunResult, Finding | None, str | None, list[str]]
+
+
+def _haunt(path: Path, rev: str, use_ai: bool) -> HauntOutcome:
     repo = path.resolve()
     sha = resolve_sha(repo, rev)
     # Parse the same committed documentation as the source copied into Docker.
@@ -28,15 +32,17 @@ def _haunt(path: Path, rev: str, use_ai: bool) -> tuple[RunResult, Finding | Non
     steps = extract_steps_from_text(readme)
     if not steps:
         raise ValueError("No runnable fenced shell setup steps found in the committed README.")
+    flags = flag_steps(steps)
     result = run_steps(repo, sha, steps)
     failure = result.first_failure
     if failure is None or result.infra_error:
-        return result, None, None
+        return result, None, None, flags
     finding = classify(failure, repo, sha)
-    if not use_ai:
-        return result, finding, AI_DISABLED
-    finding, note = diagnose(finding, steps, repo, sha)
-    return result, finding, note
+    note = AI_DISABLED
+    if use_ai:
+        finding, note = diagnose(finding, steps, repo, sha)
+    finding.risk_flags = flags
+    return result, finding, note, flags
 
 
 @app.command()
@@ -49,7 +55,7 @@ def haunt(
     """Run committed README setup in a fresh container and name the first failure."""
     try:
         with render.running(json_output):
-            result, finding, ai_note = _haunt(path, rev, not no_ai)
+            result, finding, ai_note, flags = _haunt(path, rev, not no_ai)
     except subprocess.CalledProcessError:
         render.error("Cannot read the Git revision or committed README. Check the path and --rev.", json_output)
         raise typer.Exit(2)
@@ -59,7 +65,7 @@ def haunt(
     except (OSError, ValueError) as error:
         render.error(str(error), json_output)
         raise typer.Exit(2)
-    render.haunt_result(result, finding, ai_note, json_output)
+    render.haunt_result(result, finding, ai_note, json_output, flags)
     if result.infra_error or (finding and finding.status == Status.INCONCLUSIVE):
         raise typer.Exit(2)
     if result.passed:

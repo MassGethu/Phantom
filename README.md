@@ -64,6 +64,12 @@ answer is schema-constrained JSON and is kept only when its evidence line appear
 the step output and it names the same requirement as the rule. When Ollama is
 unreachable, haunt still shows the rule finding and says why no explanation appears.
 
+Haunt also flags risky README commands as warnings; they never block a run or change
+the exit code. The flagged patterns are piping `curl`/`wget` into a shell, `sudo`,
+`chmod 777`, unpinned `pip install`, `npm i -g`, `--insecure`/`curl -k`, and exporting
+a `*TOKEN`, `*SECRET`, `*KEY` or `*PASSWORD` variable with a non-placeholder value.
+The flag names the variable but never prints the value.
+
 `ghost bisect [PATH] [--good SHA] [--bad HEAD] [--no-ai]` parses HEAD's README
 once and runs those same commands against older commits in fresh containers, using
 a first-parent binary search. `--good` must pass and `--bad` must fail, or bisect

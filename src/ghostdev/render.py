@@ -51,16 +51,26 @@ def explanation_label(ai_note: str | None) -> str:
     return "Gemma explanation" if model.startswith("gemma") else f"AI explanation ({model or 'model'})"
 
 
+def risk_flags(flags: list[str]) -> None:
+    if not flags:
+        return
+    console.print(Text("Risk flags (warnings only, nothing was blocked):", style="yellow"))
+    for flag in flags:
+        console.print(Text(f"⚠️  {flag}"))
+
+
 def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None = None,
-                 json_output: bool = False) -> None:
+                 json_output: bool = False, flags: list[str] | None = None) -> None:
+    flags = flags or []
     if json_output:
         print(json.dumps({"run": asdict(result), "finding": finding.to_dict() if finding else None,
-                          "ai_note": ai_note}))
+                          "ai_note": ai_note, "risk_flags": flags}))
         return
     console.print(Text(config.APP_NAME, style="bold"))
     for step in result.steps:
         icon = "✅" if step.exit_code == 0 and not step.timed_out else "❌"
         console.print(Text(f"{icon} step {step.step.index}  {step.step.command}"))
+    risk_flags(flags)
     if result.infra_error:
         error(result.infra_error)
         return
