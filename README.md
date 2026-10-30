@@ -181,7 +181,9 @@ That run exits 0 with `✅ env.DATABASE_URL`. To reset the demo:
 git checkout README.md && rm assumptions.lock
 ```
 
-Drop `--no-ai` from haunt or bisect to add a local model's explanation.
+Drop `--no-ai` from haunt or bisect to add a local model's explanation. With
+`gemma3:4b` pulled, haunt on the demo shows a validated "Gemma explanation" and took
+about 2.5 s here, or about 5 s while the model loads on the first call.
 
 ## Commands
 
