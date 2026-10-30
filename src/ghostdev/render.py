@@ -45,10 +45,14 @@ def suggested_fix(finding: Finding) -> str | None:
         return None
 
 
-def explanation_label(ai_note: str | None) -> str:
+def model_label(model: str | None) -> str:
     """Name the model honestly: the fallback model is not Gemma."""
-    model = (ai_note or "").removeprefix("explained by ")
+    model = model or ""
     return "Gemma explanation" if model.startswith("gemma") else f"AI explanation ({model or 'model'})"
+
+
+def explanation_label(ai_note: str | None) -> str:
+    return model_label((ai_note or "").removeprefix("explained by "))
 
 
 def risk_flags(flags: list[str]) -> None:
@@ -125,7 +129,7 @@ def bisect_result(result: BisectResult, use_ai: bool = True) -> None:
     details.add_row("Requirement", Text(requirement))
     if finding:
         details.add_row("Evidence", Text(finding.evidence))
-    details.add_row("AI explanation" if result.explanation else "Explanation",
+    details.add_row(model_label(result.explanation_model) if result.explanation else "Explanation",
                     Text(result.explanation or ("AI explanation unavailable or rejected" if use_ai
                                                 else "AI disabled with --no-ai")))
     parts: list[object] = [details]

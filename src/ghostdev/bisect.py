@@ -62,6 +62,7 @@ class BisectResult:
     finding: Finding | None = None
     commit: CommitInfo | None = None
     explanation: str | None = None
+    explanation_model: str | None = None
     cache_note: str | None = None
 
 
@@ -274,6 +275,8 @@ def run_bisect(repo: Path, good: str | None = None, bad: str = "HEAD", *, use_ai
         result.commit, diff = commit_info(repo, culprit, failing.finding.name if failing.finding else None)
         # The model is asked once, after the search, never inside the loop.
         if use_ai and failing.finding:
-            result.explanation = explain_commit(diff, failing.finding, generate_fn)
+            explained = explain_commit(diff, failing.finding, generate_fn)
+            if explained:
+                result.explanation_model, result.explanation = explained
     save_last(repo, result, steps)
     return result

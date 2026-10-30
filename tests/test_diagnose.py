@@ -152,7 +152,8 @@ def test_explain_commit_requires_identifier_in_diff() -> None:
     finding = classify(failing())
     diff = '+    db_path = os.environ["DATABASE_URL"]\n'
     assert explain_commit(diff, finding, fake({'identifier': 'DATABASE_URL',
-                                               'explanation': 'It reads DATABASE_URL.'})) == 'It reads DATABASE_URL.'
+                                               'explanation': 'It reads DATABASE_URL.'})) == (
+        'gemma3:4b', 'It reads DATABASE_URL.')
     assert explain_commit(diff, finding, fake({'identifier': 'OTHER', 'explanation': 'x'})) is None
 
     def explode(prompt: str, schema: dict[str, Any]) -> Any:

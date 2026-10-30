@@ -136,6 +136,7 @@ def test_explanation_requested_once(generated: tuple[Path, list[str]]) -> None:
 
     result = run_bisect(repo, run=FakeRunner(shas), env=lambda: ENV, generate_fn=model)
     assert result.explanation == 'c4 reads DATABASE_URL.'
+    assert result.explanation_model == 'gemma3:4b'
     assert len(prompts) == 1 and 'DATABASE_URL' in prompts[0]
 
 
@@ -195,3 +196,19 @@ def test_cli_ambiguous_and_skipped_boundary_exit_2(monkeypatch: pytest.MonkeyPat
     skips.add(0)  # the first run never probed shas[0], so nothing is cached for it
     boundary = CliRunner().invoke(cli.app, ['bisect', str(repo), '--no-ai'])
     assert boundary.exit_code == 2 and 'Traceback' not in boundary.stdout
+
+
+@pytest.mark.parametrize(('model', 'label'), [('gemma3:4b', 'Gemma explanation'),
+                                              ('qwen2.5-coder:14b', 'AI explanation (qwen2.5-coder:14b)')])
+def test_cli_names_the_model_that_explained(monkeypatch: pytest.MonkeyPatch, generated: tuple[Path, list[str]],
+                                            model: str, label: str) -> None:
+    repo, shas = generated
+    answer = {'identifier': 'DATABASE_URL', 'explanation': 'c4 reads DATABASE_URL.'}
+
+    def fake(path: Path, good: str | None, bad: str, **kwargs: Any) -> bis.BisectResult:
+        return run_bisect(path, good, bad, run=FakeRunner(shas), env=lambda: ENV,
+                          generate_fn=lambda prompt, schema: (model, answer), on_probe=kwargs['on_probe'])
+
+    monkeypatch.setattr(cli, 'run_bisect', fake)
+    output = CliRunner().invoke(cli.app, ['bisect', str(repo)]).stdout
+    assert label in output and 'c4 reads DATABASE_URL.' in output

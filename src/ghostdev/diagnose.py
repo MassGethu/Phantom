@@ -122,8 +122,9 @@ def diagnose(finding: Finding, steps: list[Step], repo: Path, sha: str,
     return checked, f"explained by {model}"
 
 
-def explain_commit(diff: str, finding: Finding, generate_fn: GenerateFn = generate) -> str | None:
-    """Explain what the culprit diff introduced; the named identifier must appear in the diff."""
+def explain_commit(diff: str, finding: Finding,
+                   generate_fn: GenerateFn = generate) -> tuple[str, str] | None:
+    """Return (model, explanation) for the culprit diff; the identifier must appear in it."""
     if not finding.name or not mentions(finding.name, diff):
         return None
     prompt = (
@@ -134,9 +135,10 @@ def explain_commit(diff: str, finding: Finding, generate_fn: GenerateFn = genera
         f"Evidence: {finding.evidence}\n<<<DIFF\n{diff[:config.MAX_DIFF_CHARS]}\nDIFF>>>\n"
     )
     try:
-        _, payload = generate_fn(prompt, COMMIT_SCHEMA)
+        model, payload = generate_fn(prompt, COMMIT_SCHEMA)
     except AIUnavailable:
         return None
     if not isinstance(payload, dict) or payload.get("identifier") != finding.name:
         return None
-    return clean_explanation(payload.get("explanation"))
+    explanation = clean_explanation(payload.get("explanation"))
+    return (model, explanation) if explanation else None
