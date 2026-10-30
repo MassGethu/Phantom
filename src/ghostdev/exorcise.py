@@ -5,7 +5,7 @@ import difflib
 from pathlib import Path
 from typing import Any
 
-from ghostdev import lockfile
+from ghostdev import config, copilot, lockfile
 from ghostdev.bisect import load_last
 from ghostdev.diagnose import diagnose
 from ghostdev.models import Finding
@@ -28,6 +28,8 @@ class ExorcisePlan:
     introduced_in: dict[str, str | None]
     lock: dict[str, Any] | None
     diff: str
+    workflow: str | None = None
+    workflow_note: str | None = None
 
     @property
     def readme_path(self) -> Path:
@@ -36,6 +38,10 @@ class ExorcisePlan:
     @property
     def lock_path(self) -> Path:
         return self.repo / lockfile.LOCK_NAME
+
+    @property
+    def workflow_path(self) -> Path:
+        return self.repo / copilot.WORKFLOW_PATH
 
 
 def _guard_readme(repo: Path, name: str, committed: str) -> None:
@@ -86,6 +92,21 @@ def plan(path: Path, rev: str = "HEAD", run: RunFn = run_steps, use_ai: bool = T
     return ExorcisePlan(repo, sha, name, original, verification, introduced, lock, diff)
 
 
+def add_copilot(exorcism: ExorcisePlan) -> ExorcisePlan:
+    """Attach a workflow built only from the patched steps that just passed."""
+    after = exorcism.verification.after
+    if not (exorcism.verification.verified and after and after.passed):
+        exorcism.workflow_note = "No Copilot workflow: the patched README did not fully pass."
+    elif exorcism.workflow_path.exists():
+        exorcism.workflow_note = f"{copilot.WORKFLOW_PATH} already exists; it is left unchanged."
+    else:
+        exorcism.workflow = copilot.render_workflow([result.step.command for result in after.steps],
+                                                    config.IMAGE)
+        exorcism.diff += "".join(difflib.unified_diff(
+            [], exorcism.workflow.splitlines(keepends=True), "/dev/null", f"b/{copilot.WORKFLOW_PATH}"))
+    return exorcism
+
+
 def apply(exorcism: ExorcisePlan) -> list[Path]:
     """Write README and lock to the working tree. The user reviews and commits them."""
     patched = exorcism.verification.patched_text
@@ -95,4 +116,11 @@ def apply(exorcism: ExorcisePlan) -> list[Path]:
     _guard_readme(exorcism.repo, exorcism.readme_name, exorcism.original)
     exorcism.readme_path.write_text(patched, encoding="utf-8", newline="")
     exorcism.lock_path.write_text(lockfile.dump(exorcism.lock), encoding="utf-8")
-    return [exorcism.readme_path, exorcism.lock_path]
+    written = [exorcism.readme_path, exorcism.lock_path]
+    if exorcism.workflow:
+        exorcism.workflow_path.parent.mkdir(parents=True, exist_ok=True)
+        # Mode "x" refuses to overwrite a workflow created since the plan was shown.
+        with exorcism.workflow_path.open("x", encoding="utf-8") as handle:
+            handle.write(exorcism.workflow)
+        written.append(exorcism.workflow_path)
+    return written

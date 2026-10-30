@@ -173,6 +173,8 @@ def exorcise_plan(exorcism: ExorcisePlan) -> None:
         console.print(table)
     if exorcism.diff:
         console.print(Syntax(exorcism.diff, "diff", theme="ansi_dark", background_color="default"))
+    if exorcism.workflow_note:
+        console.print(Text(exorcism.workflow_note, style="yellow"))
     if verification.unverified and not verification.verified:
         console.print("No fix was verified, so no files will be written.", style="yellow")
 

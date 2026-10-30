@@ -189,7 +189,7 @@ Drop `--no-ai` from haunt or bisect to add a local model's explanation.
 |---|---|---|---|
 | `ghost haunt [PATH] [--rev HEAD] [--no-ai] [--json]` | setup passed | requirement found | infrastructure or inconclusive |
 | `ghost bisect [PATH] [--good SHA] [--bad HEAD] [--no-ai]` | culprit found | bad boundary or unreadable history | skips hide the culprit, or infrastructure |
-| `ghost exorcise [PATH] [--rev HEAD] [--apply] [--no-ai]` | applied, declined, or nothing to fix | no fix could be verified | dirty README, invalid lock, or inconclusive |
+| `ghost exorcise [PATH] [--rev HEAD] [--apply] [--no-ai] [--copilot]` | applied, declined, or nothing to fix | no fix could be verified | dirty README, invalid lock, or inconclusive |
 | `ghost doctor [--lock assumptions.lock]` | all checks pass | a check failed | lock missing or invalid |
 
 Errors are one-line messages, never tracebacks. Examples: Docker not running, a
@@ -261,6 +261,12 @@ no rerun proved are listed as "needs a human" and never enter the lock. Existing
 lock entries are merged by `id`. `introduced_in` is filled from the last
 `ghost bisect` of the same requirement.
 
+`--copilot` also proposes `.github/workflows/copilot-setup-steps.yml` for the GitHub
+Copilot coding agent. The workflow is built only from the patched README commands
+that just passed in the container, and they run in one bash step to match the
+single shell session they were verified in. It appears in the same diff and the
+same confirmation, and an existing workflow is never overwritten.
+
 ### doctor
 
 Checks each lock entry locally:
@@ -309,6 +315,9 @@ Ollama. Docker tests skip when the daemon is unavailable. With Docker they cover
   even when the failing step ran in a subdirectory.
 - README commands run with network access inside containers. Containers are not a
   security boundary for hostile repositories.
+- The Copilot workflow is verified in the `python:3.12-slim` container, not on a
+  GitHub runner, and is only emitted when exorcise verified a fix (not when the README
+  already passes).
 - The lock records the image by digest (`python@sha256:…`) without its tag.
 - Tested only on macOS with Apple Silicon and the generated demo. No arbitrary
   repository or Windows host support is promised.
@@ -319,7 +328,7 @@ Ollama. Docker tests skip when the daemon is unavailable. With Docker they cover
 
 Not built yet:
 - `ghost ward`: a CI check that blocks PRs adding new undocumented assumptions.
-- `copilot-setup-steps.yml`, devcontainer and AGENTS.md output from verified steps.
+- Devcontainer and AGENTS.md output from verified steps.
 - Contributor personas, such as Windows or Mac setups.
 - Verified fixes for missing tools, services and versions.
 - Support for setup instructions outside the README.

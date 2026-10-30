@@ -9,7 +9,7 @@ from ghostdev import lockfile, render
 from ghostdev.bisect import BoundaryError, InconclusiveError, run_bisect
 from ghostdev.diagnose import diagnose
 from ghostdev.doctor import FAIL, run_doctor
-from ghostdev.exorcise import DirtyReadmeError, apply as exorcise_apply, plan as exorcise_plan
+from ghostdev.exorcise import DirtyReadmeError, add_copilot, apply as exorcise_apply, plan as exorcise_plan
 from ghostdev.lockfile import LockError
 from ghostdev.models import Finding, RunResult, Status
 from ghostdev.parse import committed_readme, extract_steps_from_text
@@ -105,11 +105,15 @@ def exorcise(
     rev: str = typer.Option("HEAD", help="Committed revision to verify against."),
     apply: bool = typer.Option(False, "--apply", help="Write changes without asking."),
     no_ai: bool = typer.Option(False, "--no-ai", help="Use deterministic rules only."),
+    copilot: bool = typer.Option(False, "--copilot",
+                                 help="Also write .github/workflows/copilot-setup-steps.yml."),
 ) -> None:
     """Verify a README-only fix in fresh containers, then write README.md and assumptions.lock."""
     try:
         with render.running(False, "Verifying README fixes in fresh containers…"):
             exorcism = exorcise_plan(path, rev, use_ai=not no_ai)
+        if copilot:
+            exorcism = add_copilot(exorcism)
     except subprocess.CalledProcessError:
         render.error("Cannot read the Git revision or committed README. Check the path and --rev.")
         raise typer.Exit(2)

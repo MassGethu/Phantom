@@ -145,3 +145,33 @@ def test_cli_unverified_exits_1(demo: tuple[Path, list[str]], monkeypatch: pytes
     result = CliRunner().invoke(cli.app, ['exorcise', str(repo), '--apply'])
     assert result.exit_code == 1 and 'needs a human' in result.stdout
     assert git(repo, 'status', '--porcelain') == ''
+
+
+def test_copilot_workflow_comes_from_the_passing_patched_steps(demo: tuple[Path, list[str]]) -> None:
+    import yaml
+    repo, shas = demo
+    exorcism = exorcise.add_copilot(exorcise.plan(repo, run=fake_run, use_ai=False))
+    assert '+++ b/.github/workflows/copilot-setup-steps.yml' in exorcism.diff
+    written = exorcise.apply(exorcism)
+    assert written[-1] == repo / '.github/workflows/copilot-setup-steps.yml'
+    run = yaml.safe_load(written[-1].read_text())['jobs']['copilot-setup-steps']['steps'][-1]['run']
+    assert run.splitlines()[0] == 'export DATABASE_URL=sqlite:///./todo.db'
+    assert 'python app.py init' in run and 'git clone' not in run
+    assert git(repo, 'rev-parse', 'HEAD') == shas[-1]
+
+
+def test_existing_workflow_is_never_overwritten(demo: tuple[Path, list[str]]) -> None:
+    repo, _ = demo
+    path = repo / '.github/workflows/copilot-setup-steps.yml'
+    path.parent.mkdir(parents=True)
+    path.write_text('mine\n')
+    exorcism = exorcise.add_copilot(exorcise.plan(repo, run=fake_run, use_ai=False))
+    assert exorcism.workflow is None and 'left unchanged' in exorcism.workflow_note
+    exorcise.apply(exorcism)
+    assert path.read_text() == 'mine\n'
+
+
+def test_cli_copilot_flag(cli_demo: Path) -> None:
+    result = CliRunner().invoke(cli.app, ['exorcise', str(cli_demo), '--no-ai', '--copilot'], input='n\n')
+    assert result.exit_code == 0 and 'copilot-setup-steps.yml' in result.stdout
+    assert not (cli_demo / '.github').exists()
