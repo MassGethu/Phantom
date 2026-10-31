@@ -137,6 +137,14 @@ def test_haunt_hints_the_next_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert '→ Find the commit that introduced it: phantom bisect .' in runner.invoke(cli.app, ['haunt']).stdout
 
 
+def test_missing_tool_hint_does_not_suggest_bisect(monkeypatch: pytest.MonkeyPatch) -> None:
+    step = StepResult(Step(1, 'uv add typer', 1), 127, 'bash: line 5: uv: command not found\n')
+    result = RunResult('abc', 'image', 'linux/arm64', [step], False)
+    monkeypatch.setattr(cli, '_haunt', lambda path, rev, use_ai, on_step=None: (result, classify(step), None, []))
+    output = runner.invoke(cli.app, ['haunt']).stdout
+    assert 'Document how to install uv in the README' in output and 'phantom bisect' not in output
+
+
 def test_haunt_passes_a_progress_callback_only_outside_json(monkeypatch: pytest.MonkeyPatch) -> None:
     callbacks: list[object] = []
 

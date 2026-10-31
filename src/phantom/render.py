@@ -19,7 +19,7 @@ from phantom.bisect import BisectResult, FAIL, PASS
 from phantom.doctor import CheckResult, FAIL, PASS as CHECK_PASS, WARN
 from phantom.exorcise import ExorcisePlan
 from phantom.lockfile import requirement_id
-from phantom.models import Finding, RunResult, Status, Step, StepResult
+from phantom.models import Finding, ReqType, RunResult, Status, Step, StepResult
 from phantom.verify import PatchError, render_fix
 
 console = Console()
@@ -80,7 +80,7 @@ def error(message: str, json_output: bool = False) -> None:
     if json_output:
         print(json.dumps({"status": "inconclusive", "error": message}))
     else:
-        console.print(Text(message, style="red"))
+        console.print(Text(message, style="red"), soft_wrap=True)
 
 
 def suggested_fix(finding: Finding) -> str | None:
@@ -151,6 +151,11 @@ def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None
         hint("Re-run in a fresh container; this result proves nothing either way.")
     elif command:
         hint(f"Verify and patch it: phantom exorcise {_target(target)}")
+    elif finding.req_type == ReqType.TOOL:
+        # A missing tool is a gap in the README or image, not a commit bisect could find.
+        tool = finding.name or "the tool"
+        hint(f"Document how to install {tool} in the README, "
+             f"or set PHANTOM_IMAGE to an image that already has it.")
     else:
         hint(f"Find the commit that introduced it: phantom bisect {_target(target)}")
 

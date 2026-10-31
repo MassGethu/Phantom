@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import tempfile
 from typing import Any
@@ -236,6 +237,9 @@ def run_bisect(repo: Path, good: str | None = None, bad: str = "HEAD", *, use_ai
     bad_sha = resolve_sha(repo, bad)
     good_sha = resolve_sha(repo, good) if good else oldest_commit(repo, bad_sha)
     if good_sha == bad_sha:
+        if git_output(repo, "rev-parse", "--is-shallow-repository").strip() == "true":
+            raise BoundaryError("This is a shallow clone, so there is no older history to search. "
+                                f"Run git -C {shlex.quote(str(repo))} fetch --unshallow, then retry.")
         raise BoundaryError("--good and --bad are the same commit; pick an older --good.")
     history = first_parent_history(repo, good_sha, bad_sha)
     # One fixed check: the commands a newcomer follows today, parsed once from HEAD's README.

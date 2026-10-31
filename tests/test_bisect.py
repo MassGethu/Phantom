@@ -99,6 +99,14 @@ def test_bad_good_boundary_is_clear(generated: tuple[Path, list[str]]) -> None:
         bisect(repo, FakeRunner(shas), good=shas[7])
 
 
+def test_shallow_clone_explains_the_missing_history(generated: tuple[Path, list[str]], tmp_path: Path) -> None:
+    repo, shas = generated
+    shallow = tmp_path / 'shallow'
+    subprocess.run(['git', 'clone', '-q', '--depth', '1', repo.as_uri(), str(shallow)], check=True)
+    with pytest.raises(BoundaryError, match='fetch --unshallow'):
+        bisect(shallow, FakeRunner(shas))
+
+
 def test_infrastructure_at_boundary_is_inconclusive(generated: tuple[Path, list[str]]) -> None:
     repo, shas = generated
     with pytest.raises(InconclusiveError):
