@@ -36,6 +36,9 @@ def is_long_running(command: str) -> bool:
     return bool(LONG_RUNNING.match(command)) and not command.rstrip().endswith("&")
 
 
+SERVER_POLLS_PER_SECOND = 5
+
+
 def command_lines(index: int, command: str, *, marker: bool = True) -> list[str]:
     """Shell lines that run one step and leave its exit status in __rc."""
     if not is_long_running(command):
@@ -44,8 +47,12 @@ def command_lines(index: int, command: str, *, marker: bool = True) -> list[str]
     started = f"printf '\\n::phantom-started {index}::\\n'; " if marker else ""
     # stdin is the script itself under `bash -s`; bash already detaches async jobs from it,
     # and the explicit redirect keeps that true if job control is ever enabled.
+    # Poll rather than sleep the whole grace period, so a server that dies at once fails at once.
+    polls = config.SERVER_GRACE * SERVER_POLLS_PER_SECOND
     return ["(", command, f") </dev/null >{log} 2>&1 &",
-            f"__pid=$!; sleep {config.SERVER_GRACE}",
+            "__pid=$!; __polls=0",
+            f'while [ "$__polls" -lt {polls} ] && kill -0 "$__pid" 2>/dev/null; do '
+            f'sleep {1 / SERVER_POLLS_PER_SECOND:g}; __polls=$((__polls + 1)); done',
             f'if kill -0 "$__pid" 2>/dev/null; then __rc=0; cat {log}; {started}'
             f'else wait "$__pid"; __rc=$?; cat {log}; fi']
 

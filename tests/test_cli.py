@@ -156,3 +156,12 @@ def test_haunt_passes_a_progress_callback_only_outside_json(monkeypatch: pytest.
     runner.invoke(cli.app, ['haunt'])
     runner.invoke(cli.app, ['haunt', '--json'])
     assert callable(callbacks[0]) and callbacks[1] is None
+
+
+def test_missing_file_hint_says_the_readme_never_creates_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    step = StepResult(Step(1, 'python hello.py --count=3', 1), 2,
+                      "python: can't open file '/repo/hello.py': [Errno 2] No such file or directory\n")
+    result = RunResult('abc', 'image', 'linux/arm64', [step], False)
+    monkeypatch.setattr(cli, '_haunt', lambda path, rev, use_ai, on_step=None: (result, classify(step), None, []))
+    output = ' '.join(runner.invoke(cli.app, ['haunt']).stdout.split())
+    assert 'file / hello.py' in output and 'The README uses hello.py but no step creates it' in output

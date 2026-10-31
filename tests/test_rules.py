@@ -23,6 +23,8 @@ def result(output: str, timed_out: bool = False) -> StepResult:
     ('Connection refused on port 6379', ReqType.SERVICE, '6379'),
     ("FileNotFoundError: [Errno 2] No such file or directory: 'config.yml'", ReqType.FILE, 'config.yml'),
     ('cat: config.yml: No such file or directory', ReqType.FILE, 'config.yml'),
+    ("python: can't open file '/repo/hello.py': [Errno 2] No such file or directory", ReqType.FILE, 'hello.py'),
+    ('ERROR:    Error loading ASGI app. Could not import module "main".', ReqType.MODULE, 'main'),
 ])
 def test_rule_patterns(output: str, kind: ReqType, name: str) -> None:
     finding = classify(result(output))

@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import time
 
 import pytest
 
@@ -72,6 +73,14 @@ def test_server_that_exits_early_keeps_its_exit_code(monkeypatch: pytest.MonkeyP
     result = run_bash('\n'.join(lines) + '\n')
     assert 'rc=127' in result.stdout and 'command not found' in result.stdout
     assert 'phantom-started' not in result.stdout
+
+
+def test_server_that_dies_at_once_does_not_wait_out_the_grace_period(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, 'SERVER_GRACE', 10)
+    lines = [*command_lines(1, 'PATH=/nonexistent flask run'), 'echo "rc=$__rc"']
+    started = time.monotonic()
+    result = run_bash('\n'.join(lines) + '\n')
+    assert 'rc=127' in result.stdout and time.monotonic() - started < 3
 
 
 def test_started_marker_and_note(monkeypatch: pytest.MonkeyPatch) -> None:

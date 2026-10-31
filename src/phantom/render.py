@@ -156,6 +156,10 @@ def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None
         tool = finding.name or "the tool"
         hint(f"Document how to install {tool} in the README, "
              f"or set PHANTOM_IMAGE to an image that already has it.")
+    elif finding.req_type in (ReqType.FILE, ReqType.MODULE) and finding.name:
+        # The README leans on something it never creates; bisect only helps if a commit removed it.
+        hint(f"The README uses {finding.name} but no step creates it. Add that step or fix the "
+             f"path; if it used to work, phantom bisect {_target(target)} finds when it broke.")
     else:
         hint(f"Find the commit that introduced it: phantom bisect {_target(target)}")
 
