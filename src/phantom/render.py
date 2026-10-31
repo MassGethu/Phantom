@@ -73,7 +73,8 @@ def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None
     console.print(Text(config.APP_NAME, style="bold"))
     for step in result.steps:
         icon = "✅" if step.exit_code == 0 and not step.timed_out else "❌"
-        console.print(Text(f"{icon} step {step.step.index}  {step.step.command}"))
+        note = f"  (started, still running after {config.SERVER_GRACE}s)" if step.started else ""
+        console.print(Text(f"{icon} step {step.step.index}  {step.step.command}{note}"))
     risk_flags(flags)
     if result.infra_error:
         error(result.infra_error)

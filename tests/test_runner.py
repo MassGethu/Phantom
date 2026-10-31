@@ -1,7 +1,10 @@
 import subprocess
 
-from phantom.models import Step
-from phantom.runner import build_script, error_message, parse_output
+import pytest
+
+from phantom import config, render
+from phantom.models import RunResult, Step, StepResult
+from phantom.runner import build_script, command_lines, error_message, is_long_running, parse_output
 
 
 def test_marker_parsing() -> None:
@@ -25,3 +28,56 @@ def test_unreachable_docker_gets_a_friendly_message() -> None:
         b'failed to connect to the docker API at unix:///x.sock; check if the path is correct '
         b'and if the daemon is running: dial unix /x.sock: connect: no such file or directory'))
     assert error_message(error) == "Docker isn't running. Start Docker Desktop and retry."
+
+
+@pytest.mark.parametrize('command', [
+    'npm start', 'npm run dev', 'yarn dev', 'pnpm run start:prod', 'PORT=3000 npm start',
+    'flask run', 'flask --app hello run', 'python -m flask run --debug', 'python manage.py runserver',
+    'poetry run python manage.py runserver', 'uv run uvicorn app:app', 'uvicorn main:app --reload',
+    'python -m http.server 8000', 'fastapi dev main.py', 'bundle exec rails s', 'rails server',
+    'bundle exec jekyll serve', 'hugo server -D', 'streamlit run app.py', 'npx vite', 'next dev',
+    'php artisan serve'])
+def test_servers_are_long_running(command: str) -> None:
+    assert is_long_running(command)
+
+
+@pytest.mark.parametrize('command', [
+    'npm install', 'npm run build', 'npm test', 'npm run devtools-check', 'yarn', 'vite build',
+    'flask db upgrade', 'python manage.py migrate', 'rails db:migrate', 'pip install uvicorn',
+    'python app.py init', 'npm start &'])
+def test_ordinary_commands_are_not(command: str) -> None:
+    assert not is_long_running(command)
+
+
+def run_bash(script: str) -> subprocess.CompletedProcess[str]:
+    # Fed on stdin exactly like `docker exec -i ... bash -s`.
+    return subprocess.run(['bash', '-s'], input=script, capture_output=True, text=True, timeout=30)
+
+
+def test_server_that_stays_up_is_started_and_cannot_eat_the_script(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, 'SERVER_GRACE', 1)
+    # A fake server that would swallow the rest of the script if it could read stdin.
+    lines = ['nodemon() { echo listening; cat > /dev/null; sleep 3; }', *command_lines(2, 'nodemon'),
+             'echo "rc=$__rc"', 'echo after']
+    result = run_bash('\n'.join(lines) + '\n')
+    assert '::phantom-started 2::' in result.stdout and 'listening' in result.stdout
+    assert 'rc=0' in result.stdout and 'after' in result.stdout
+
+
+def test_server_that_exits_early_keeps_its_exit_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, 'SERVER_GRACE', 1)
+    lines = [*command_lines(1, 'PATH=/nonexistent flask run'), 'echo "rc=$__rc"']
+    result = run_bash('\n'.join(lines) + '\n')
+    assert 'rc=127' in result.stdout and 'command not found' in result.stdout
+    assert 'phantom-started' not in result.stdout
+
+
+def test_started_marker_and_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    steps = [Step(1, 'npm start', 1)]
+    results = parse_output('::phantom-step 1::\nlistening\n\n::phantom-started 1::\n::phantom-rc 1 0::\n', steps)
+    assert results[0].started and results[0].exit_code == 0 and results[0].output == 'listening\n\n'
+    assert '</dev/null' in build_script(steps)
+    monkeypatch.setattr(render.console, 'width', 160)
+    with render.console.capture() as captured:
+        render.haunt_result(RunResult('a' * 40, 'img', 'p', [StepResult(steps[0], 0, '', started=True)], True), None)
+    assert 'npm start  (started, still running after 10s)' in captured.get()

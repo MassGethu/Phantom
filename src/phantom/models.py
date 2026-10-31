@@ -45,6 +45,7 @@ class StepResult:
     exit_code: int | None
     output: str
     timed_out: bool = False
+    started: bool = False
 
 
 @dataclass

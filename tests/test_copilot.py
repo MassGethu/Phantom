@@ -4,6 +4,7 @@ import subprocess
 import pytest
 import yaml
 
+from phantom import config
 from phantom.copilot import SHELL, STEP_GUARD, WORKFLOW_PATH, python_version, render_workflow
 
 COMMANDS = ['export DATABASE_URL=sqlite:///./todo.db', 'python app.py init',
@@ -16,7 +17,8 @@ def test_run_block_round_trips_commands_exactly() -> None:
     assert job['permissions'] == {'contents': 'read'}
     assert job['steps'][1]['with'] == {'python-version': '3.12'}
     run = job['steps'][-1]['run']
-    assert [line for line in run.splitlines() if line != STEP_GUARD] == '\n'.join(COMMANDS).splitlines()
+    plumbing = {STEP_GUARD, '__rc=$?'}
+    assert [line for line in run.splitlines() if line not in plumbing] == '\n'.join(COMMANDS).splitlines()
     assert data[True]['push']['paths'] == [str(WORKFLOW_PATH)]  # PyYAML reads the `on` key as True
 
 
@@ -55,3 +57,10 @@ def test_shell_has_no_errexit_or_pipefail_like_the_verifier(tmp_path: Path) -> N
 def test_first_failing_step_stops_the_workflow_like_the_verifier(tmp_path: Path) -> None:
     result = run_like_github(tmp_path, ['echo one', 'exit_code() { return 3; }; exit_code', 'echo never'])
     assert result.returncode == 3 and 'one' in result.stdout and 'never' not in result.stdout
+
+
+def test_server_step_does_not_hang_the_workflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, 'SERVER_GRACE', 1)
+    result = run_like_github(tmp_path, ['nodemon() { sleep 3; }', 'nodemon', 'echo after'])
+    assert result.returncode == 0 and 'after' in result.stdout
+    assert 'phantom-started' not in result.stdout

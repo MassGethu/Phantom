@@ -9,6 +9,7 @@ MODEL = os.environ.get("PHANTOM_MODEL", "gemma3:4b")
 FALLBACK_MODEL = "qwen2.5-coder:14b"
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 RUN_TIMEOUT = 120
+SERVER_GRACE = 10
 DOCKER_TIMEOUT = 180
 GIT_TIMEOUT = 30
 AI_TIMEOUT = 20

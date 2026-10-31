@@ -207,6 +207,12 @@ starts with a `$ ` or `% ` prompt is read as a transcript, so only prompted line
 run and example output is ignored. Clone boilerplate is skipped because the
 repository is already copied to `/repo`.
 
+Servers and dev watchers (`npm start`, `flask run`, `uvicorn`, `manage.py runserver`,
+`rails s` and similar, from a fixed list) are started in the background. If one is
+still running after 10 s it passes as "started" and stays up for later steps, such
+as a `curl` against it; if it exits sooner, its real exit code and output are used.
+The Copilot workflow uses the same template, so a server step cannot hang the job.
+
 The container is never given host mounts or host environment variables. It is
 removed afterwards, even after a timeout. The resolved image digest and platform
 are recorded.
@@ -326,6 +332,8 @@ Ollama. Docker tests skip when the daemon is unavailable. With Docker they cover
   that a port is open, not which service is listening.
 - `cp NAME.example NAME` fixes look for the example file at the repository root,
   even when the failing step ran in a subdirectory.
+- A step that never exits and is not on the server list (an endless demo, for
+  example) still times out after 120 s and is reported as inconclusive.
 - README commands run with network access inside containers. Containers are not a
   security boundary for hostile repositories.
 - The Copilot workflow is verified in the `python:3.12-slim` container, not on a

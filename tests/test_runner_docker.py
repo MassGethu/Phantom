@@ -4,6 +4,7 @@ import subprocess
 
 import pytest
 
+from phantom import config
 from phantom.models import Step
 from phantom.parse import extract_steps
 from phantom.runner import resolve_sha, run_steps
@@ -66,3 +67,13 @@ def test_no_containers_left() -> None:
     result = subprocess.run(['docker', 'ps', '-aq', '--filter', 'name=phantom-'],
                             capture_output=True, text=True, check=True)
     assert not result.stdout.strip()
+
+
+def test_server_step_starts_and_later_steps_reach_it(demo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, 'SERVER_GRACE', 2)
+    probe = 'python -c "import urllib.request as u; print(u.urlopen(\'http://127.0.0.1:8000\').status)"'
+    steps = [Step(1, 'python -m http.server 8000', 1), Step(2, probe, 2)]
+    result = run_steps(demo, resolve_sha(demo), steps)
+    assert result.infra_error is None, result.infra_error
+    assert result.passed and result.steps[0].started
+    assert '200' in result.steps[1].output

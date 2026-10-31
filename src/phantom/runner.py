@@ -11,6 +11,38 @@ from phantom.models import RunResult, Step, StepResult
 
 RunFn = Callable[[Path, str, list[Step]], RunResult]
 
+_RUNNER = r"(?:(?:uv|poetry|pipenv|pdm)\s+run\s+)?"
+_PYTHON = r"(?:python3?\s+(?:-m\s+)?)?"
+_END = r"(?=[\s:]|$)"
+# Servers and watchers are meant to keep running; a fixed rule list, never model output.
+LONG_RUNNING = re.compile(rf"""^(?:\w+=\S*\s+)*{_RUNNER}(?:
+    (?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:start|dev|serve|preview){_END}
+  | (?:npx\s+)?(?:next\s+(?:dev|start){_END}|vite(?:\s+(?:dev|serve|preview))?(?=\s+-|\s*$)|nodemon{_END})
+  | {_PYTHON}flask\s+(?:--app\s+\S+\s+)?run{_END}
+  | {_PYTHON}manage\.py\s+runserver{_END}
+  | {_PYTHON}(?:uvicorn|gunicorn|hypercorn|http\.server){_END}
+  | (?:fastapi\s+(?:dev|run)|streamlit\s+run|php\s+artisan\s+serve){_END}
+  | (?:bundle\s+exec\s+)?(?:rails\s+(?:s|server)|jekyll\s+serve|hugo\s+server){_END}
+)""", re.X)
+
+
+def is_long_running(command: str) -> bool:
+    return bool(LONG_RUNNING.match(command)) and not command.rstrip().endswith("&")
+
+
+def command_lines(index: int, command: str, *, marker: bool = True) -> list[str]:
+    """Shell lines that run one step and leave its exit status in __rc."""
+    if not is_long_running(command):
+        return [command, "__rc=$?"]
+    log = f"/tmp/phantom-server-{index}.log"
+    started = f"printf '\\n::phantom-started {index}::\\n'; " if marker else ""
+    # stdin is the script itself under `bash -s`; bash already detaches async jobs from it,
+    # and the explicit redirect keeps that true if job control is ever enabled.
+    return ["(", command, f") </dev/null >{log} 2>&1 &",
+            f"__pid=$!; sleep {config.SERVER_GRACE}",
+            f'if kill -0 "$__pid" 2>/dev/null; then __rc=0; cat {log}; {started}'
+            f'else wait "$__pid"; __rc=$?; cat {log}; fi']
+
 
 def _command(args: list[str], *, data: bytes | None = None,
              timeout: int = config.DOCKER_TIMEOUT) -> subprocess.CompletedProcess[bytes]:
@@ -53,8 +85,9 @@ def build_script(steps: list[Step]) -> str:
     lines = ["exec 2>&1", "export PYTHONUNBUFFERED=1", "cd /repo || exit 125"]
     # One bash process preserves exports, working directory and shell state between steps.
     for step in steps:
-        lines.extend([f"echo '::phantom-step {step.index}::'", step.command,
-                      f"__rc=$?; printf '\\n::phantom-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc"])
+        lines.append(f"echo '::phantom-step {step.index}::'")
+        lines.extend(command_lines(step.index, step.command))
+        lines.append(f"printf '\\n::phantom-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc")
     lines.append("exit 0")
     return "\n".join(lines) + "\n"
 
@@ -67,7 +100,10 @@ def parse_output(output: str, steps: list[Step], *, timed_out: bool = False,
     for line in output.splitlines(keepends=True):
         start = re.fullmatch(r"::phantom-step (\d+)::\s*", line)
         end = re.fullmatch(r"::phantom-rc (\d+) (-?\d+)::\s*", line)
-        if start and int(start[1]) in by_index:
+        started = re.fullmatch(r"::phantom-started (\d+)::\s*", line)
+        if started and current and int(started[1]) == current.step.index:
+            current.started = True
+        elif start and int(start[1]) in by_index:
             current = StepResult(by_index[int(start[1])], None, "")
             results.append(current)
         elif end and current and int(end[1]) == current.step.index:
