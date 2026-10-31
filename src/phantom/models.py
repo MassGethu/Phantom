@@ -48,6 +48,7 @@ class StepResult:
     output: str
     timed_out: bool = False
     started: bool = False
+    duration: float | None = None
 
 
 @dataclass

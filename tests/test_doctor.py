@@ -83,9 +83,11 @@ def test_cli_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     failed = CliRunner().invoke(cli.app, ['doctor', '--lock', str(lock)])
     assert failed.exit_code == 1, failed.stdout
     assert '❌ env.DATABASE_URL' in failed.stdout and 'hint: export DATABASE_URL' in failed.stdout
+    assert '0 passed · 1 failed · 0 warnings' in failed.stdout and '→ Fix the failed checks' in failed.stdout
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///./todo.db')
     passed = CliRunner().invoke(cli.app, ['doctor', '--lock', str(lock)])
     assert passed.exit_code == 0 and '✅ env.DATABASE_URL' in passed.stdout
+    assert '1 passed · 0 failed · 0 warnings' in passed.stdout and '→' not in passed.stdout
     assert 'sqlite' not in passed.stdout
 
 

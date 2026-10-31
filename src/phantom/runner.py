@@ -1,15 +1,21 @@
 """Execute committed source in disposable Docker containers, never on the host."""
 
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 import re
 import subprocess
+import threading
+import time
 import uuid
 
 from phantom import config
 from phantom.models import RunResult, Step, StepResult
 
 RunFn = Callable[[Path, str, list[Step]], RunResult]
+StepCallback = Callable[[Step, int], None]
+STEP_MARKER = re.compile(r"::phantom-step (\d+)::\s*")
+RC_MARKER = re.compile(r"::phantom-rc (\d+) (-?\d+)::\s*")
 
 _RUNNER = r"(?:(?:uv|poetry|pipenv|pdm)\s+run\s+)?"
 _PYTHON = r"(?:python3?\s+(?:-m\s+)?)?"
@@ -100,8 +106,8 @@ def parse_output(output: str, steps: list[Step], *, timed_out: bool = False,
     results: list[StepResult] = []
     current: StepResult | None = None
     for line in output.splitlines(keepends=True):
-        start = re.fullmatch(r"::phantom-step (\d+)::\s*", line)
-        end = re.fullmatch(r"::phantom-rc (\d+) (-?\d+)::\s*", line)
+        start = STEP_MARKER.fullmatch(line)
+        end = RC_MARKER.fullmatch(line)
         started = re.fullmatch(r"::phantom-started (\d+)::\s*", line)
         if started and current and int(started[1]) == current.step.index:
             current.started = True
@@ -135,8 +141,70 @@ def error_message(error: Exception) -> str:
     return str(error)
 
 
+@dataclass
+class Execution:
+    output: str = ""
+    returncode: int | None = None
+    timed_out: bool = False
+    # step index -> [started, finished] on the host clock, from the streamed markers.
+    times: dict[int, list[float | None]] = field(default_factory=dict)
+
+
+def _stream(args: list[str], script: str, steps: list[Step], timeout: int,
+            on_step: StepCallback | None) -> Execution:
+    """Run the script while reading its output live, so progress and timing come from markers."""
+    by_index = {step.index: step for step in steps}
+    execution = Execution()
+    lines: list[str] = []
+    process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT)
+
+    def feed() -> None:
+        try:
+            assert process.stdin is not None
+            process.stdin.write(script.encode())
+            process.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass  # The process exited early; its output explains why.
+
+    def read() -> None:
+        assert process.stdout is not None
+        for raw in iter(process.stdout.readline, b""):
+            line = _decode(raw)
+            lines.append(line)
+            now = time.monotonic()
+            if (start := STEP_MARKER.fullmatch(line)) and int(start[1]) in by_index:
+                execution.times[int(start[1])] = [now, None]
+                if on_step:
+                    on_step(by_index[int(start[1])], len(steps))
+            elif (end := RC_MARKER.fullmatch(line)) and int(end[1]) in execution.times:
+                execution.times[int(end[1])][1] = now
+
+    writer = threading.Thread(target=feed, daemon=True)
+    reader = threading.Thread(target=read, daemon=True)
+    writer.start()
+    reader.start()
+    try:
+        execution.returncode = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        execution.timed_out = True
+    reader.join(timeout=config.GIT_TIMEOUT)
+    execution.output = "".join(lines)
+    return execution
+
+
+def _durations(results: list[StepResult], times: dict[int, list[float | None]]) -> None:
+    finished = time.monotonic()
+    for result in results:
+        started, ended = times.get(result.step.index, [None, None])
+        if started is not None:
+            result.duration = round((ended or finished) - started, 1)
+
+
 def run_steps(repo: Path, sha: str, steps: list[Step],
-              timeout: int = config.RUN_TIMEOUT) -> RunResult:
+              timeout: int = config.RUN_TIMEOUT, on_step: StepCallback | None = None) -> RunResult:
     container = f"phantom-{uuid.uuid4().hex[:8]}"
     result = RunResult(sha, config.IMAGE, "unknown", [], False)
     try:
@@ -148,21 +216,19 @@ def run_steps(repo: Path, sha: str, steps: list[Step],
         # Copy an archive rather than mounting a host directory into the container.
         archive = _command(["git", "-C", str(repo), "archive", sha], timeout=config.GIT_TIMEOUT)
         _command(["docker", "cp", "-", f"{container}:/repo"], data=archive.stdout)
-        try:
-            execution = subprocess.run(["docker", "exec", "-i", container, "bash", "-s"],
-                                       input=build_script(steps).encode(), capture_output=True,
-                                       timeout=timeout, check=False)
-            output = _decode(execution.stdout) + _decode(execution.stderr)
-            result.steps = parse_output(output, steps, process_code=execution.returncode)
+        execution = _stream(["docker", "exec", "-i", container, "bash", "-s"], build_script(steps),
+                            steps, timeout, on_step)
+        if execution.timed_out:
+            result.steps = parse_output(execution.output, steps, timed_out=True)
+            if not result.steps:
+                result.infra_error = "Container execution timed out before any setup step started."
+        else:
+            result.steps = parse_output(execution.output, steps, process_code=execution.returncode)
             result.passed = (execution.returncode == 0 and len(result.steps) == len(steps)
                              and all(s.exit_code == 0 for s in result.steps))
             if not result.steps and not result.passed:
-                result.infra_error = f"Container execution failed: {output.strip()}"
-        except subprocess.TimeoutExpired as error:
-            result.steps = parse_output(_decode(error.stdout) + _decode(error.stderr),
-                                        steps, timed_out=True)
-            if not result.steps:
-                result.infra_error = "Container execution timed out before any setup step started."
+                result.infra_error = f"Container execution failed: {execution.output.strip()}"
+        _durations(result.steps, execution.times)
     except (OSError, subprocess.SubprocessError, ValueError) as error:
         result.infra_error = error_message(error)
     finally:

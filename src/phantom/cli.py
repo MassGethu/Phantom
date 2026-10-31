@@ -15,7 +15,7 @@ from phantom.models import Finding, RunResult, Status
 from phantom.parse import committed_readme, extract_steps_from_text
 from phantom.risk import flag_steps
 from phantom.rules import classify
-from phantom.runner import resolve_sha, run_steps
+from phantom.runner import StepCallback, resolve_sha, run_steps
 
 app = typer.Typer(help="Find the hidden assumptions haunting repository setup.")
 AI_DISABLED = "AI disabled with --no-ai"
@@ -24,7 +24,7 @@ AI_DISABLED = "AI disabled with --no-ai"
 HauntOutcome = tuple[RunResult, Finding | None, str | None, list[str]]
 
 
-def _haunt(path: Path, rev: str, use_ai: bool) -> HauntOutcome:
+def _haunt(path: Path, rev: str, use_ai: bool, on_step: StepCallback | None = None) -> HauntOutcome:
     repo = path.resolve()
     sha = resolve_sha(repo, rev)
     # Parse the same committed documentation as the source copied into Docker.
@@ -33,7 +33,7 @@ def _haunt(path: Path, rev: str, use_ai: bool) -> HauntOutcome:
     if not steps:
         raise ValueError("No runnable fenced shell setup steps found in the committed README.")
     flags = flag_steps(steps)
-    result = run_steps(repo, sha, steps)
+    result = run_steps(repo, sha, steps, on_step=on_step)
     failure = result.first_failure
     if failure is None or result.infra_error:
         return result, None, None, flags
@@ -54,8 +54,8 @@ def haunt(
 ) -> None:
     """Run committed README setup in a fresh container and name the first failure."""
     try:
-        with render.running(json_output):
-            result, finding, ai_note, flags = _haunt(path, rev, not no_ai)
+        with render.running(json_output) as status:
+            result, finding, ai_note, flags = _haunt(path, rev, not no_ai, render.step_progress(status))
     except subprocess.CalledProcessError:
         render.error("Cannot read the Git revision or committed README. Check the path and --rev.", json_output)
         raise typer.Exit(2)
@@ -65,7 +65,7 @@ def haunt(
     except (OSError, ValueError) as error:
         render.error(str(error), json_output)
         raise typer.Exit(2)
-    render.haunt_result(result, finding, ai_note, json_output, flags)
+    render.haunt_result(result, finding, ai_note, json_output, flags, path)
     if result.infra_error or (finding and finding.status == Status.INCONCLUSIVE):
         raise typer.Exit(2)
     if result.passed:
@@ -95,7 +95,7 @@ def bisect(
     except (InconclusiveError, OSError, ValueError) as error:
         render.error(str(error))
         raise typer.Exit(2)
-    render.bisect_result(result, not no_ai)
+    render.bisect_result(result, not no_ai, path)
     raise typer.Exit(0 if result.culprit else 2)
 
 
@@ -139,7 +139,7 @@ def exorcise(
     except (DirtyReadmeError, OSError) as error:
         render.error(str(error))
         raise typer.Exit(2)
-    render.exorcise_written(written)
+    render.exorcise_written(written, path)
 
 
 @app.command()

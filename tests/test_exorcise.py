@@ -141,7 +141,7 @@ def cli_demo(demo: tuple[Path, list[str]], monkeypatch: pytest.MonkeyPatch) -> P
 def test_cli_declined_writes_nothing(cli_demo: Path) -> None:
     result = CliRunner().invoke(cli.app, ['exorcise', str(cli_demo), '--no-ai'], input='n\n')
     assert result.exit_code == 0, result.stdout
-    for text in ('Apply these changes?', 'No files changed.', 'Fix verified',
+    for text in ('Apply these changes?', 'No files changed.', 'Fix verified', 'Proposed changes',
                  'export DATABASE_URL'):
         assert text in result.stdout
     assert not (cli_demo / 'assumptions.lock').exists()

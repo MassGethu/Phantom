@@ -172,6 +172,7 @@ def test_cli_exit_codes(monkeypatch: pytest.MonkeyPatch, generated: tuple[Path, 
     found = runner.invoke(cli.app, ['bisect', str(repo), '--no-ai'])
     assert found.exit_code == 0, found.stdout
     assert shas[3][:7] in found.stdout and 'First bad commit' in found.stdout
+    assert f'will record {shas[3][:7]} as introduced_in' in ' '.join(found.stdout.split())
     assert 'AI disabled with --no-ai' in found.stdout
     bad_good = runner.invoke(cli.app, ['bisect', str(repo), '--good', shas[5]])
     assert bad_good.exit_code == 1 and 'pick an older --good' in bad_good.stdout

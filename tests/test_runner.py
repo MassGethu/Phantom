@@ -1,10 +1,12 @@
+from pathlib import Path
 import subprocess
 
 import pytest
 
 from phantom import config, render
 from phantom.models import RunResult, Step, StepResult
-from phantom.runner import build_script, command_lines, error_message, is_long_running, parse_output
+from phantom.runner import (_durations, _stream, build_script, command_lines, error_message,
+                            is_long_running, parse_output)
 
 
 def test_marker_parsing() -> None:
@@ -81,3 +83,34 @@ def test_started_marker_and_note(monkeypatch: pytest.MonkeyPatch) -> None:
     with render.console.capture() as captured:
         render.haunt_result(RunResult('a' * 40, 'img', 'p', [StepResult(steps[0], 0, '', started=True)], True), None)
     assert 'npm start  (started, still running after 10s)' in captured.get()
+
+
+def test_stream_reports_each_step_as_it_starts_and_times_it() -> None:
+    steps = [Step(1, 'sleep 0.3', 1), Step(2, 'true', 2)]
+    script = ''.join(f"printf '::phantom-step {s.index}::\\n'; {s.command}; printf '::phantom-rc {s.index} 0::\\n'\n"
+                     for s in steps)
+    seen: list[tuple[int, int]] = []
+    execution = _stream(['bash', '-s'], script, steps, 10, lambda step, total: seen.append((step.index, total)))
+    assert seen == [(1, 2), (2, 2)] and execution.returncode == 0 and not execution.timed_out
+    results = parse_output(execution.output, steps, process_code=execution.returncode)
+    _durations(results, execution.times)
+    assert results[0].duration >= 0.3 and results[1].duration < 0.3
+
+
+def test_stream_timeout_kills_the_process_and_keeps_partial_output() -> None:
+    steps = [Step(1, 'sleep 30', 1)]
+    execution = _stream(['bash', '-s'], "printf '::phantom-step 1::\\npartial\\n'; sleep 30\n", steps, 1, None)
+    assert execution.timed_out and 'partial' in execution.output
+    results = parse_output(execution.output, steps, timed_out=True)
+    _durations(results, execution.times)
+    assert results[0].timed_out and results[0].duration >= 0.9
+
+
+def test_step_line_shows_duration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(render.console, 'width', 160)
+    step = StepResult(Step(1, 'npm install', 1), 0, '', duration=4.24)
+    with render.console.capture() as captured:
+        render.haunt_result(RunResult('b' * 40, 'img', 'linux/arm64', [step], True), None)
+    output = captured.get()
+    assert 'step 1  npm install  4.2s' in output
+    assert f'Phantom haunt · {Path.cwd().name} · @ bbbbbbb · {config.IMAGE} · linux/arm64' in output
