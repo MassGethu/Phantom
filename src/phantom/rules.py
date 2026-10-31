@@ -22,6 +22,21 @@ MAX_EXPLANATION_SENTENCES = 2
 SECRET_PATTERN = re.compile(
     r"sk-[\w-]+|ghp_[\w]+|AKIA[\w]+|xox[bp]-[\w-]+|-----BEGIN|[A-Za-z0-9+/=_-]{33,}"
 )
+# Match diagnostic grammar rather than a list of known runtimes or package names.
+# Keep identifiers bounded so prose such as "build target not found" is not a tool.
+TOOL_NAME = r"(?!(?:is|was|not|in|on|the|a)\b)[A-Za-z0-9_./+-]+"
+MISSING_TOOL_PATTERNS = tuple(re.compile(pattern, re.I) for pattern in (
+    rf"\bno\s+['\"`]?(?P<name>{TOOL_NAME})['\"`]?\s+command\s+(?:(?:could be|was)\s+)?found\b",
+    rf"\b(?:could not|cannot|unable to)\s+(?:find|locate)\s+(?:the\s+)?(?:required\s+)?"
+    rf"(?:command|executable|program|binary)\s+['\"`]?(?P<name>{TOOL_NAME})['\"`]?(?=\s|[,:;.!]|$)",
+    rf"\b(?:command|executable|program|binary)\s+['\"`]?(?P<name>{TOOL_NAME})['\"`]?\s+"
+    rf"(?:(?:is|was)\s+)?(?:not found|missing|not installed)\b",
+))
+MISSING_ENV_PATTERNS = (
+    re.compile(r"\b(?:environment variable|env var)\s+['\"`]?(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+               r"['\"`]?\s+(?:is\s+)?(?:not set|unset|missing|required)\b", re.I),
+    re.compile(r"^(?:ERROR:\s*)?(?P<name>[A-Z][A-Z0-9_]*)\s+is\s+(?:not set|unset)\b"),
+)
 
 
 def safe_example_value(value: str | None) -> str:
@@ -92,6 +107,15 @@ def classify(result: StepResult, repo: Path | None = None, sha: str | None = Non
             match = re.search(pattern, line)
             if match:
                 return _finding(result, req_type, match[1].strip(), line, repo, sha)
+    # Prefer an explicitly missing executable over a related configuration variable
+    # (for example, Gradle reports both JAVA_HOME and a missing java command).
+    for req_type, generic_patterns in ((ReqType.TOOL, MISSING_TOOL_PATTERNS),
+                                       (ReqType.ENV_VAR, MISSING_ENV_PATTERNS)):
+        for line in lines:
+            for pattern in generic_patterns:
+                match = pattern.search(line)
+                if match:
+                    return _finding(result, req_type, match['name'], line, repo, sha)
     if re.search(r"Connection refused", result.output, re.I):
         for line in lines:
             port = re.search(r":(\d{2,5})\b|\bport[ =:]+(\d{2,5})\b|\(['\"](?:localhost|127\.0\.0\.1)['\"],\s*(\d{2,5})\)", line, re.I)

@@ -72,6 +72,35 @@ def test_no_ai_flag_reaches_haunt(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == [False, True]
 
 
+@pytest.mark.parametrize(('output', 'tool'), [
+    ("ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.", 'java'),
+    ("Could not find executable 'cmake'", 'cmake'),
+    ('No "node" command could be found in your PATH.', 'node'),
+])
+def test_haunt_no_ai_classifies_generic_tools(monkeypatch: pytest.MonkeyPatch,
+                                           output: str, tool: str) -> None:
+    # Exercise the real haunt/classification path, replacing only Git and Docker I/O.
+    monkeypatch.setattr(cli, 'resolve_sha', lambda *args: 'abc')
+    monkeypatch.setattr(cli, 'committed_readme', lambda *args: ('README.md', '```bash\n./gradlew assembleDebug\n```'))
+
+    def run(repo: Path, sha: str, steps: list[Step]) -> RunResult:
+        return RunResult(sha, 'image', 'linux/arm64', [StepResult(steps[0], 1, output)], False)
+
+    def unexpected_ai(*args: object) -> None:
+        pytest.fail('--no-ai must not call AI diagnosis')
+
+    monkeypatch.setattr(cli, 'run_steps', run)
+    monkeypatch.setattr(cli, 'diagnose', unexpected_ai)
+    invocation = runner.invoke(cli.app, ['haunt', '--no-ai', '--json'])
+    assert invocation.exit_code == 1
+    data = json.loads(invocation.stdout)
+    assert data['finding']['req_type'] == 'tool'
+    assert data['finding']['name'] == tool
+    assert data['finding']['cause'] == 'rule_matched'
+    assert data['finding']['fix'] is None
+    assert data['ai_note'] == 'AI disabled with --no-ai'
+
+
 def test_json_includes_ai_note(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, '_haunt', lambda path, rev, use_ai: (*failure(), 'AI explanation unavailable: down', []))
     data = json.loads(runner.invoke(cli.app, ['haunt', '--json']).stdout)

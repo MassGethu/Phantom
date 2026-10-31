@@ -32,6 +32,59 @@ def test_rule_patterns(output: str, kind: ReqType, name: str) -> None:
     assert finding.evidence in output.splitlines()
 
 
+SELFLOCK_JAVA_ERROR = "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+
+
+@pytest.mark.parametrize(('output', 'name'), [
+    (SELFLOCK_JAVA_ERROR, 'java'),
+    ('JAVA_HOME is not set\nNo "java" command could be found in your PATH.', 'java'),
+    ("No 'node' command could be found in your PATH.", 'node'),
+    ('No `ruby` command was found on PATH.', 'ruby'),
+    ("ERROR: Could not find executable 'cmake'", 'cmake'),
+    ('Unable to locate the required binary "ffmpeg" on PATH', 'ffmpeg'),
+    ('Cannot find program python3.12', 'python3.12'),
+    ("Required executable 'protoc' is missing", 'protoc'),
+    ('command pnpm is not installed', 'pnpm'),
+    ('Program "rustc" was not found in PATH', 'rustc'),
+])
+def test_generic_missing_tools(output: str, name: str) -> None:
+    finding = classify(result(output))
+    assert (finding.req_type, finding.name) == (ReqType.TOOL, name)
+    assert finding.status == Status.HYPOTHESIS
+    assert finding.cause == Cause.RULE_MATCHED
+    assert finding.evidence in output.splitlines()
+    assert finding.fix is None  # Recognition does not invent installation commands.
+
+
+@pytest.mark.parametrize(('output', 'name'), [
+    ('ERROR: JAVA_HOME is not set', 'JAVA_HOME'),
+    ("Environment variable 'ANDROID_HOME' is not set", 'ANDROID_HOME'),
+    ('env var DATABASE_URL is missing', 'DATABASE_URL'),
+    ('Environment variable "custom_path" is required', 'custom_path'),
+])
+def test_generic_missing_environment_variables(output: str, name: str) -> None:
+    finding = classify(result(output))
+    assert (finding.req_type, finding.name) == (ReqType.ENV_VAR, name)
+    assert finding.cause == Cause.RULE_MATCHED
+
+
+@pytest.mark.parametrize('output', [
+    'Build target not found', 'No matching distribution found for java',
+    'Could not find config file config.yml', 'Executable is not found',
+    'Could not find executable in PATH', 'java exited with status 1',
+    'JAVA_HOME is set but invalid', 'Environment variable FOO is set',
+])
+def test_generic_patterns_do_not_guess_without_a_missing_requirement(output: str) -> None:
+    finding = classify(result(output))
+    assert finding.req_type == ReqType.UNKNOWN
+    assert finding.status == Status.OBSERVED
+
+
+def test_generic_patterns_preserve_infrastructure_and_timeout_priority() -> None:
+    assert classify(result(SELFLOCK_JAVA_ERROR + '\nCould not resolve host')).status == Status.INCONCLUSIVE
+    assert classify(result(SELFLOCK_JAVA_ERROR, timed_out=True)).status == Status.INCONCLUSIVE
+
+
 @pytest.mark.parametrize('output', ['Could not resolve host', 'Temporary failure in name resolution',
     'Connection timed out', 'pull access denied', 'TLS handshake failure', 'SSL: CERTIFICATE failure',
     'No space left on device'])

@@ -227,6 +227,13 @@ they never block a run or change the exit code. The flagged patterns are:
 
 ### AI explanations
 
+Missing-command diagnosis also works with `--no-ai`: rules recognize shell errors
+and generic messages such as `Could not find executable 'cmake'` or
+`no 'java' command could be found`. Explicit missing-environment-variable messages
+are recognized too. If an error names both a missing executable and a related
+variable (such as `JAVA_HOME`), the missing executable takes priority. These are
+hypotheses based on captured output; missing tools do not get automatic install fixes.
+
 Without `--no-ai`, Phantom asks Ollama for schema-constrained JSON at temperature 0,
 with a 20 s timeout. It uses `gemma3:4b` and falls back to `qwen2.5-coder:14b` if
 Gemma is not pulled. The output label names whichever model actually answered.
