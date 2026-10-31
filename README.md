@@ -202,8 +202,10 @@ output. These failure modes are covered by tests and were run live.
 
 Reads the README and source **as committed** at `--rev`, so uncommitted changes are
 excluded. It runs fenced `bash`/`sh`/`shell`/`console`/`zsh` (or untagged) blocks in
-one bash session in a fresh `python:3.12-slim` container. Clone boilerplate is
-skipped because the repository is already copied to `/repo`.
+one bash session in a fresh `python:3.12-slim` container. A block whose first command
+starts with a `$ ` or `% ` prompt is read as a transcript, so only prompted lines
+run and example output is ignored. Clone boilerplate is skipped because the
+repository is already copied to `/repo`.
 
 The container is never given host mounts or host environment variables. It is
 removed afterwards, even after a timeout. The resolved image digest and platform

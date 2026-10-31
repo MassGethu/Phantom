@@ -40,6 +40,20 @@ def test_continuation_source_and_clone() -> None:
         (1, "echo one two", 7), (2, "cd subdir", 9)]
 
 
+def test_untagged_transcript_skips_output_lines() -> None:
+    click = '```\n$ python hello.py --count=3\nYour name: Click\nHello, Click!\n```\n'
+    flask = '```\n$ flask run\n  * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)\n```\n'
+    sh = '```sh\n$ pip install -e . \\\n  --quiet\nSuccessfully installed\n% make\n```\n'
+    assert [s.command for s in extract_steps_from_text(click + flask + sh)] == [
+        "python hello.py --count=3", "flask run", "pip install -e . --quiet", "make"]
+
+
+def test_transcript_state_resets_per_block() -> None:
+    text = '```\n$ echo one\nout\n```\n```bash\necho two\n$ echo three\necho four\n```\n'
+    assert [s.command for s in extract_steps_from_text(text)] == [
+        "echo one", "echo two", "echo three", "echo four"]
+
+
 def test_console_continuation_and_tilde_fence() -> None:
     steps = extract_steps_from_text('~~~console\n$ echo one \\\n two\none two\n~~~')
     assert [s.command for s in steps] == ["echo one two"]
