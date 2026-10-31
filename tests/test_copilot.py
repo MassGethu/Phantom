@@ -1,9 +1,10 @@
 from pathlib import Path
+import subprocess
 
 import pytest
 import yaml
 
-from phantom.copilot import WORKFLOW_PATH, python_version, render_workflow
+from phantom.copilot import SHELL, STEP_GUARD, WORKFLOW_PATH, python_version, render_workflow
 
 COMMANDS = ['export DATABASE_URL=sqlite:///./todo.db', 'python app.py init',
             "python app.py add 'buy milk: now'", 'cat <<EOF > x.cfg\n  key: "#value"\nEOF']
@@ -14,7 +15,8 @@ def test_run_block_round_trips_commands_exactly() -> None:
     job = data['jobs']['copilot-setup-steps']
     assert job['permissions'] == {'contents': 'read'}
     assert job['steps'][1]['with'] == {'python-version': '3.12'}
-    assert job['steps'][-1]['run'] == '\n'.join(COMMANDS) + '\n'
+    run = job['steps'][-1]['run']
+    assert [line for line in run.splitlines() if line != STEP_GUARD] == '\n'.join(COMMANDS).splitlines()
     assert data[True]['push']['paths'] == [str(WORKFLOW_PATH)]  # PyYAML reads the `on` key as True
 
 
@@ -33,3 +35,23 @@ def test_python_version(image: str, version: str | None) -> None:
 def test_no_commands_is_an_error() -> None:
     with pytest.raises(ValueError):
         render_workflow([])
+
+
+def run_like_github(tmp_path: Path, commands: list[str]) -> subprocess.CompletedProcess[str]:
+    """Execute the run block the way Actions does: write it to a file and pass it as {0}."""
+    step = yaml.safe_load(render_workflow(commands, 'node:20'))['jobs']['copilot-setup-steps']['steps'][-1]
+    script = tmp_path / 'step.sh'
+    script.write_text(step['run'])
+    argv = [str(script) if part == '{0}' else part for part in step['shell'].split()]
+    return subprocess.run(argv, capture_output=True, text=True, cwd=tmp_path)
+
+
+def test_shell_has_no_errexit_or_pipefail_like_the_verifier(tmp_path: Path) -> None:
+    assert SHELL == 'bash --noprofile --norc {0}'
+    result = run_like_github(tmp_path, ['false; echo recovered', 'false | true'])
+    assert result.returncode == 0 and 'recovered' in result.stdout
+
+
+def test_first_failing_step_stops_the_workflow_like_the_verifier(tmp_path: Path) -> None:
+    result = run_like_github(tmp_path, ['echo one', 'exit_code() { return 3; }; exit_code', 'echo never'])
+    assert result.returncode == 3 and 'one' in result.stdout and 'never' not in result.stdout

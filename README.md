@@ -267,8 +267,9 @@ README steps and its commits are ancestors of the revision being verified.
 `--copilot` also proposes `.github/workflows/copilot-setup-steps.yml` for the GitHub
 Copilot coding agent. The workflow is built only from the patched README commands
 that just passed in the container, and they run in one bash step to match the
-single shell session they were verified in. It appears in the same diff and the
-same confirmation, and an existing workflow is never overwritten.
+single shell session they were verified in: no `errexit` or `pipefail`, and the job
+stops at the first step that exits non-zero, as the verifier does. It appears in the
+same diff and the same confirmation, and an existing workflow is never overwritten.
 
 ### doctor
 
