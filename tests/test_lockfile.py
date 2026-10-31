@@ -90,3 +90,27 @@ def test_unreadable_locks_raise_lock_error_with_one_line(tmp_path: Path) -> None
     with pytest.raises(LockError, match='line 2') as raised:
         lockfile.load(path)
     assert '\n' not in str(raised.value)
+
+
+@pytest.mark.parametrize('field', ['id', 'type', 'cause', 'status'])
+@pytest.mark.parametrize('value', [['verified_fix'], {'a': 1}, 5, None])
+def test_wrong_field_types_raise_lock_error_not_type_error(field: str, value: object) -> None:
+    data = lock('A')
+    data['requirements'][0][field] = value
+    with pytest.raises(LockError, match=f'{field} must be a string'):
+        lockfile.validate(data)
+
+
+@pytest.mark.parametrize('check', [{'kind': ['env_set']}, {'kind': {'a': 1}}, ['env_set']])
+def test_unhashable_check_kind_raises_lock_error(check: object) -> None:
+    data = lock('A')
+    data['requirements'][0]['check'] = check
+    with pytest.raises(LockError, match='check.kind'):
+        lockfile.validate(data)
+
+
+def test_status_list_in_a_file_gives_readable_error(tmp_path: Path) -> None:
+    path = tmp_path / 'assumptions.lock'
+    path.write_text(lockfile.dump(lock('A')).replace('status: verified_fix', 'status: [verified_fix]'))
+    with pytest.raises(LockError, match='status must be a string'):
+        lockfile.load(path)

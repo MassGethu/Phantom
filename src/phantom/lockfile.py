@@ -59,6 +59,10 @@ def _entry_errors(item: Any, position: int) -> list[str]:
     missing = [name for name in FIELDS if name not in item]
     if missing:
         return [f"{where} is missing {', '.join(missing)}"]
+    # Type checks come first: YAML can put lists or mappings anywhere, and those are unhashable.
+    wrong = [name for name in ("id", "type", "cause", "status") if not isinstance(item[name], str)]
+    if wrong:
+        return [f"{where}.{name} must be a string" for name in wrong]
     errors: list[str] = []
     try:
         req_type = ReqType(item["type"])
@@ -81,7 +85,8 @@ def _entry_errors(item: Any, position: int) -> list[str]:
         errors.append(f"{where}.verification must record command_hash, before: fail, after: pass")
     if item["status"] not in VERIFIED:
         errors.append(f"{where}.status must be verified_fix or verified_together")
-    if not isinstance(item["check"], dict) or item["check"].get("kind") not in CHECK_KINDS:
+    kind = item["check"].get("kind") if isinstance(item["check"], dict) else None
+    if not isinstance(kind, str) or kind not in CHECK_KINDS:
         errors.append(f"{where}.check.kind must be one of {', '.join(sorted(CHECK_KINDS))}")
     return errors
 
@@ -104,7 +109,7 @@ def validate(data: Any) -> None:
     else:
         for position, item in enumerate(requirements):
             errors.extend(_entry_errors(item, position))
-        ids = [item.get("id") for item in requirements if isinstance(item, dict)]
+        ids = [item["id"] for item in requirements if isinstance(item, dict) and isinstance(item.get("id"), str)]
         if len(ids) != len(set(ids)):
             errors.append("requirement ids must be unique")
     if errors:
