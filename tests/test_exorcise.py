@@ -76,6 +76,29 @@ def test_introduced_in_comes_from_cached_bisect(demo: tuple[Path, list[str]]) ->
     assert exorcism.lock['requirements'][0]['introduced_in'] == shas[3][:7]
 
 
+def test_stale_bisect_from_another_branch_is_ignored(demo: tuple[Path, list[str]]) -> None:
+    repo, shas = demo
+    run_bisect(repo, run=fake_run_for(shas), env=lambda: ('img@sha256:a', 'linux/arm64'), use_ai=False)
+    # A branch cut before the culprit that introduces the same requirement in its own commit.
+    git(repo, 'checkout', '-q', '-b', 'other', shas[2])
+    (repo / 'app.py').write_text((repo / 'app.py').read_text() + '\n# unrelated\n')
+    git(repo, 'commit', '-qam', 'unrelated')
+    git(repo, 'checkout', '-q', shas[-1], '--', 'README.md', 'app.py')
+    git(repo, 'commit', '-qam', 'same requirement, different history')
+    exorcism = exorcise.plan(repo, run=fake_run, use_ai=False)
+    assert exorcism.lock['requirements'][0]['introduced_in'] is None
+
+
+def test_bisect_of_older_readme_steps_is_ignored(demo: tuple[Path, list[str]]) -> None:
+    repo, shas = demo
+    run_bisect(repo, run=fake_run_for(shas), env=lambda: ('img@sha256:a', 'linux/arm64'), use_ai=False)
+    readme = repo / 'README.md'
+    readme.write_text(readme.read_text().replace('python app.py list', 'python app.py list\npython app.py list'))
+    git(repo, 'commit', '-qam', 'docs: add a step')
+    exorcism = exorcise.plan(repo, run=fake_run, use_ai=False)
+    assert exorcism.lock['requirements'][0]['introduced_in'] is None
+
+
 def fake_run_for(shas: list[str]) -> Any:
     def run(repo: Path, sha: str, steps: list[Step]) -> RunResult:
         if shas.index(sha) < 3:

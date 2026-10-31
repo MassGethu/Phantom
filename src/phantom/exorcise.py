@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 import difflib
 from pathlib import Path
+import subprocess
 from typing import Any
 
 from phantom import config, copilot, lockfile
 from phantom.bisect import load_last
 from phantom.diagnose import diagnose
-from phantom.models import Finding
-from phantom.parse import committed_readme, extract_steps_from_text
+from phantom.models import Finding, Step
+from phantom.parse import committed_readme, extract_steps_from_text, steps_hash
 from phantom.runner import RunFn, resolve_sha, run_steps
 from phantom.verify import Verification, render_fix, verify_readme
 
@@ -55,14 +56,24 @@ def _guard_readme(repo: Path, name: str, committed: str) -> None:
                                "exorcise only patches committed documentation.")
 
 
-def _introduced_in(repo: Path, finding: Finding) -> str | None:
-    """Use a cached bisect culprit only when it traced this same requirement."""
+def _is_ancestor(repo: Path, ancestor: str, sha: str) -> bool:
+    return subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", ancestor, sha],
+                          capture_output=True).returncode == 0
+
+
+def _introduced_in(repo: Path, sha: str, steps: list[Step], finding: Finding) -> str | None:
+    """Use a cached bisect culprit only when it traced this requirement on this history."""
     last = load_last(repo)
-    if not last or not last.get("culprit"):
+    if not last or not isinstance(last.get("culprit"), str) or not isinstance(last.get("bad"), str):
         return None
     if last.get("name") != finding.name or last.get("req_type") != finding.req_type.value:
         return None
-    return str(last["culprit"])[:7]
+    # A branch switch or README edit since the bisect makes its culprit someone else's history.
+    if last.get("repo") != str(repo) or last.get("steps_hash") != steps_hash(steps):
+        return None
+    if not (_is_ancestor(repo, last["bad"], sha) and _is_ancestor(repo, last["culprit"], sha)):
+        return None
+    return last["culprit"][:7]
 
 
 def plan(path: Path, rev: str = "HEAD", run: RunFn = run_steps, use_ai: bool = True) -> ExorcisePlan:
@@ -75,7 +86,7 @@ def plan(path: Path, rev: str = "HEAD", run: RunFn = run_steps, use_ai: bool = T
         raise ValueError("No runnable fenced shell setup steps found in the committed README.")
     explain = (lambda finding: diagnose(finding, steps, repo, sha)[0]) if use_ai else None
     verification = verify_readme(repo, sha, original, run, explain)
-    introduced = {lockfile.requirement_id(f.req_type, f.name): _introduced_in(repo, f)
+    introduced = {lockfile.requirement_id(f.req_type, f.name): _introduced_in(repo, sha, steps, f)
                   for f in verification.verified if f.name}
     lock = None
     if verification.verified and verification.patched_text:

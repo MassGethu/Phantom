@@ -261,7 +261,8 @@ Up to three rounds handle a later step failing next. Each fix is also re-tested
 alone; fixes that only pass together are marked `verified_together`. Requirements
 no rerun proved are listed as "needs a human" and never enter the lock. Existing
 lock entries are merged by `id`. `introduced_in` is filled from the last
-`phantom bisect` of the same requirement.
+`phantom bisect` of the same requirement, and only when that bisect used the same
+README steps and its commits are ancestors of the revision being verified.
 
 `--copilot` also proposes `.github/workflows/copilot-setup-steps.yml` for the GitHub
 Copilot coding agent. The workflow is built only from the patched README commands
