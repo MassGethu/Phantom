@@ -64,3 +64,9 @@ def test_server_step_does_not_hang_the_workflow(tmp_path: Path, monkeypatch: pyt
     result = run_like_github(tmp_path, ['nodemon() { sleep 3; }', 'nodemon', 'echo after'])
     assert result.returncode == 0 and 'after' in result.stdout
     assert 'phantom-started' not in result.stdout
+
+
+def test_in_repo_steps_cd_to_the_checkout(tmp_path: Path) -> None:
+    run = yaml.safe_load(render_workflow(['cd /tmp', 'pwd'], 'node:20', frozenset({2})))
+    lines = run['jobs']['copilot-setup-steps']['steps'][-1]['run'].splitlines()
+    assert lines.index('cd "$GITHUB_WORKSPACE" || exit 125') == lines.index('pwd') - 1

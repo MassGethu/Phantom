@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from phantom.parse import extract_steps, extract_steps_from_text, find_readme
+from phantom.models import Step
+from phantom.parse import extract_steps, extract_steps_from_text, find_readme, steps_hash
 
 
 def test_languages_prompts_and_console_output() -> None:
@@ -105,3 +106,29 @@ def test_unicode_in_commands_and_transcript_output_is_preserved() -> None:
     text = '```\necho "┌──┐"\n```\n```\n$ echo diagram\n┌──┐\n$ echo done\n```\n'
     assert [s.command for s in extract_steps_from_text(text)] == [
         'echo "┌──┐"', 'echo diagram', 'echo done']
+
+
+@pytest.mark.parametrize(('block', 'expected'), [
+    ('git clone https://x/a.git && cd a', []),
+    ('git clone https://x/a.git && cd a && pip install -e .', [('pip install -e .', True)]),
+    ('git clone https://x/a.git\ncd a\nmake', [('make', True)]),
+    ('git clone https://x/a.git\nmake', [('make', False)]),
+    ('git clone https://x/a.git && make', [('make', False)]),
+])
+def test_skipped_clone_returns_to_the_repo_root(block: str, expected: list[tuple[str, bool]]) -> None:
+    steps = extract_steps_from_text(f'```bash\n{block}\n```\n')
+    assert [(s.command, s.in_repo) for s in steps] == expected
+
+
+def test_clone_in_a_later_block_resets_an_earlier_cd() -> None:
+    text = ('```bash\nexpress /tmp/foo && cd /tmp/foo\n```\n'
+            '```bash\ngit clone https://github.com/expressjs/express.git --depth 1 && cd express\n```\n'
+            '```bash\nnpm install\n```\n')
+    assert [(s.command, s.in_repo) for s in extract_steps_from_text(text)] == [
+        ('express /tmp/foo && cd /tmp/foo', False), ('npm install', True)]
+
+
+def test_in_repo_changes_the_hash_only_when_set() -> None:
+    plain = [Step(1, 'make', 1)]
+    assert steps_hash(plain) == steps_hash([Step(1, 'make', 9)])
+    assert steps_hash(plain) != steps_hash([Step(1, 'make', 1, in_repo=True)])

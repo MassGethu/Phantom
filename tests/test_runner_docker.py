@@ -77,3 +77,9 @@ def test_server_step_starts_and_later_steps_reach_it(demo: Path, monkeypatch: py
     assert result.infra_error is None, result.infra_error
     assert result.passed and result.steps[0].started
     assert '200' in result.steps[1].output
+
+
+def test_in_repo_step_starts_from_the_repo_root(demo: Path) -> None:
+    steps = [Step(1, 'cd /tmp', 1), Step(2, 'pwd', 2, in_repo=True)]
+    result = run_steps(demo, resolve_sha(demo), steps)
+    assert result.passed and result.steps[1].output.strip() == '/repo'

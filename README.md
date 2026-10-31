@@ -205,7 +205,8 @@ excluded. It runs fenced `bash`/`sh`/`shell`/`console`/`zsh` (or untagged) block
 one bash session in a fresh `python:3.12-slim` container. A block whose first command
 starts with a `$ ` or `% ` prompt is read as a transcript, so only prompted lines
 run and example output is ignored. Clone boilerplate is skipped because the
-repository is already copied to `/repo`.
+repository is already copied to `/repo`; a skipped `git clone ... && cd repo` returns
+the next step to `/repo`, and anything after it on the same line still runs.
 
 Servers and dev watchers (`npm start`, `flask run`, `uvicorn`, `manage.py runserver`,
 `rails s` and similar, from a fixed list) are started in the background. If one is

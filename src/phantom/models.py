@@ -37,6 +37,8 @@ class Step:
     index: int
     command: str
     source_line: int
+    # A skipped `git clone ... && cd repo` left the reader at the repository root.
+    in_repo: bool = False
 
 
 @dataclass

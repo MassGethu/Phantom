@@ -111,8 +111,9 @@ def add_copilot(exorcism: ExorcisePlan) -> ExorcisePlan:
     elif exorcism.workflow_path.exists():
         exorcism.workflow_note = f"{copilot.WORKFLOW_PATH} already exists; it is left unchanged."
     else:
+        in_repo = frozenset(index for index, result in enumerate(after.steps, 1) if result.step.in_repo)
         exorcism.workflow = copilot.render_workflow([result.step.command for result in after.steps],
-                                                    config.IMAGE)
+                                                    config.IMAGE, in_repo)
         exorcism.diff += "".join(difflib.unified_diff(
             [], exorcism.workflow.splitlines(keepends=True), "/dev/null", f"b/{copilot.WORKFLOW_PATH}"))
     return exorcism

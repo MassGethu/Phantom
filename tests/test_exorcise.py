@@ -178,7 +178,9 @@ def test_copilot_workflow_comes_from_the_passing_patched_steps(demo: tuple[Path,
     written = exorcise.apply(exorcism)
     assert written[-1] == repo / '.github/workflows/copilot-setup-steps.yml'
     run = yaml.safe_load(written[-1].read_text())['jobs']['copilot-setup-steps']['steps'][-1]['run']
-    assert run.splitlines()[0] == 'export DATABASE_URL=sqlite:///./todo.db'
+    # The README's skipped `git clone` + `cd` becomes "start from the checkout".
+    assert run.splitlines()[:2] == ['cd "$GITHUB_WORKSPACE" || exit 125',
+                                    'export DATABASE_URL=sqlite:///./todo.db']
     assert 'python app.py init' in run and 'git clone' not in run
     assert git(repo, 'rev-parse', 'HEAD') == shas[-1]
 

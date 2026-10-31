@@ -86,6 +86,8 @@ def build_script(steps: list[Step]) -> str:
     # One bash process preserves exports, working directory and shell state between steps.
     for step in steps:
         lines.append(f"echo '::phantom-step {step.index}::'")
+        if step.in_repo:
+            lines.append("cd /repo || exit 125")
         lines.extend(command_lines(step.index, step.command))
         lines.append(f"printf '\\n::phantom-rc {step.index} %s::\\n' \"$__rc\"; [ $__rc -ne 0 ] && exit $__rc")
     lines.append("exit 0")

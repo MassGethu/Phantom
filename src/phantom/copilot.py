@@ -19,7 +19,8 @@ def python_version(image: str) -> str | None:
     return match[1] if match else None
 
 
-def render_workflow(commands: list[str], image: str = config.IMAGE) -> str:
+def render_workflow(commands: list[str], image: str = config.IMAGE,
+                    in_repo: frozenset[int] = frozenset()) -> str:
     """One bash step, matching the single shell session the commands were verified in."""
     if not commands:
         raise ValueError("No verified commands to emit.")
@@ -29,6 +30,8 @@ def render_workflow(commands: list[str], image: str = config.IMAGE) -> str:
     # A literal block keeps commands byte-for-byte; every line gets the same indent.
     lines: list[str] = []
     for index, command in enumerate(commands, 1):
+        if index in in_repo:
+            lines.append('cd "$GITHUB_WORKSPACE" || exit 125')
         for part in command_lines(index, command, marker=False):
             lines.extend(part.splitlines())
         lines.append(STEP_GUARD)

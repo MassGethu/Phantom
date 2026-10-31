@@ -10,6 +10,8 @@ from phantom import config
 from phantom.models import Step
 
 LANGUAGES = {"", "bash", "sh", "shell", "console", "zsh"}
+# `git clone URL [&& cd DIR] [&&]`; whatever follows the last && still runs.
+CLONE = re.compile(r"git\s+clone(?:\s[^&]*)??(?P<cd>&&\s*cd\s+[^\s&;|]+\s*)?(?:&&\s*|$)")
 
 
 def _diagram_start(line: str) -> bool:
@@ -51,6 +53,7 @@ def extract_steps_from_text(readme_text: str) -> list[Step]:
     pending: list[str] = []
     source_line = 0
     after_clone = False
+    enter_repo = False
     transcript: bool | None = None
     diagram = False
 
@@ -94,17 +97,26 @@ def extract_steps_from_text(readme_text: str) -> list[Step]:
             continue
         command = " ".join(pending)
         pending = []
-        if re.match(r"^git\s+clone(?:\s|$)", command):
-            after_clone = True
-            continue
-        if after_clone and re.match(r"^cd\s+\S+\s*$", command):
+        clone = CLONE.match(command)
+        if clone:
+            # The repository is already at /repo, so the clone becomes "be at the repo root".
+            enter_repo = bool(clone["cd"])
+            after_clone = not clone["cd"]
+            command = command[clone.end():].strip()
+            if not command:
+                continue
+        elif after_clone and re.match(r"^cd\s+\S+\s*$", command):
             after_clone = False
+            enter_repo = True
             continue
         after_clone = False
-        steps.append(Step(len(steps) + 1, command, source_line))
+        steps.append(Step(len(steps) + 1, command, source_line, enter_repo))
+        enter_repo = False
     return steps
 
 
 def steps_hash(steps: list[Step]) -> str:
     """Identify the exact commands a run executed, for caches and the lock file."""
-    return hashlib.sha256(json.dumps([step.command for step in steps]).encode()).hexdigest()
+    # Steps that start from the repo root hash differently; other hashes stay as before.
+    commands = [["in_repo", step.command] if step.in_repo else step.command for step in steps]
+    return hashlib.sha256(json.dumps(commands).encode()).hexdigest()
