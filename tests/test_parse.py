@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from phantom.parse import extract_steps, extract_steps_from_text, find_readme
 
 
@@ -73,3 +75,33 @@ def test_demo_readme() -> None:
     assert [s.command for s in steps] == [
         'python app.py init', 'python app.py add "buy milk"', 'python app.py list']
     assert [s.source_line for s in steps] == [7, 8, 9]
+
+
+def test_selflock_readme_skips_diagram_and_extracts_build_commands() -> None:
+    # Committed README from MassGethu/SelfLock---hackathon-innovatex,
+    # revision 57ea0a89cf1749e4b37f3232a4819c0fe61bbf17 (MIT).
+    readme = (Path(__file__).parent / 'fixtures' / 'selflock_README.md').read_text()
+    steps = extract_steps_from_text(readme)
+    assert [(s.index, s.command, s.source_line) for s in steps] == [
+        (1, './gradlew assembleDebug', 125),
+        (2, './gradlew assembleRelease', 137),
+        (3, 'adb install -r app/build/outputs/apk/debug/app-debug.apk', 143),
+    ]
+
+
+@pytest.mark.parametrize('border', [
+    '┌──────────────┐     ┌──────────────┐',
+    '╔══════════════╗',
+    '╭──────────────╮',
+    '+--------------+     +--------------+',
+])
+def test_untagged_diagram_skips_labels_and_resets_at_next_block(border: str) -> None:
+    text = f'```\n# Architecture\n\n{border}\nBrowser URL bar\nRoom database\n```\n'
+    text += '```\necho setup\n```\n```bash\necho build\n```\n'
+    assert [s.command for s in extract_steps_from_text(text)] == ['echo setup', 'echo build']
+
+
+def test_unicode_in_commands_and_transcript_output_is_preserved() -> None:
+    text = '```\necho "┌──┐"\n```\n```\n$ echo diagram\n┌──┐\n$ echo done\n```\n'
+    assert [s.command for s in extract_steps_from_text(text)] == [
+        'echo "┌──┐"', 'echo diagram', 'echo done']

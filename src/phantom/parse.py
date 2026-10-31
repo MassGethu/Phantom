@@ -12,6 +12,13 @@ from phantom.models import Step
 LANGUAGES = {"", "bash", "sh", "shell", "console", "zsh"}
 
 
+def _diagram_start(line: str) -> bool:
+    """Recognize drawing edges, not Unicode that occurs inside a shell command."""
+    if line and "\u2500" <= line[0] <= "\u257f":
+        return True
+    return re.fullmatch(r"\+(?:[-=]+\+)+(?:\s+\+(?:[-=]+\+)+)*", line) is not None
+
+
 def find_readme(repo: Path) -> Path:
     matches = sorted(path for path in repo.iterdir()
                      if path.is_file() and path.name.lower() == "readme.md")
@@ -45,6 +52,7 @@ def extract_steps_from_text(readme_text: str) -> list[Step]:
     source_line = 0
     after_clone = False
     transcript: bool | None = None
+    diagram = False
 
     for number, raw in enumerate(readme_text.splitlines(), 1):
         opening = re.match(r"^\s{0,3}(`{3,}|~{3,})([^\n]*)$", raw)
@@ -54,18 +62,24 @@ def extract_steps_from_text(readme_text: str) -> list[Step]:
                 language = opening[2].strip().lower()
                 after_clone = False
                 transcript = None
+                diagram = False
             continue
         if re.fullmatch(r"\s{0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}\s*", raw):
             fence = None
             pending = []
             continue
-        if language not in LANGUAGES:
+        if language not in LANGUAGES or diagram:
             continue
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         prompted = line.startswith(("$ ", "% "))
         if transcript is None:
+            # Untagged blocks can be architecture diagrams. Skip the entire block,
+            # including labels below its border that otherwise look like commands.
+            if language == "" and _diagram_start(line):
+                diagram = True
+                continue
             # A block that opens with a prompt is a transcript: unprompted lines are output.
             transcript = language == "console" or prompted
         if transcript and not prompted and not pending:
