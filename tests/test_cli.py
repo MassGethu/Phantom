@@ -137,12 +137,15 @@ def test_haunt_hints_the_next_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert '→ Find the commit that introduced it: phantom bisect .' in runner.invoke(cli.app, ['haunt']).stdout
 
 
-def test_missing_tool_hint_does_not_suggest_bisect(monkeypatch: pytest.MonkeyPatch) -> None:
-    step = StepResult(Step(1, 'uv add typer', 1), 127, 'bash: line 5: uv: command not found\n')
+@pytest.mark.parametrize('tool', ['uv', 'npm', 'java'])
+def test_missing_tool_hint_does_not_blame_documentation(monkeypatch: pytest.MonkeyPatch, tool: str) -> None:
+    step = StepResult(Step(1, f'{tool} --version', 1), 127, f'bash: line 5: {tool}: command not found\n')
     result = RunResult('abc', 'image', 'linux/arm64', [step], False)
     monkeypatch.setattr(cli, '_haunt', lambda path, rev, use_ai, on_step=None: (result, classify(step), None, []))
-    output = runner.invoke(cli.app, ['haunt']).stdout
-    assert 'Document how to install uv in the README' in output and 'phantom bisect' not in output
+    output = ' '.join(runner.invoke(cli.app, ['haunt', '--no-ai']).stdout.split())
+    assert f'{tool} is missing from the test environment' in output
+    assert 'Check the documented prerequisites' in output and 'PHANTOM_IMAGE' in output
+    assert 'Document how to install' not in output and 'phantom bisect' not in output
 
 
 def test_haunt_passes_a_progress_callback_only_outside_json(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,10 +161,11 @@ def test_haunt_passes_a_progress_callback_only_outside_json(monkeypatch: pytest.
     assert callable(callbacks[0]) and callbacks[1] is None
 
 
-def test_missing_file_hint_says_the_readme_never_creates_it(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_file_hint_does_not_claim_the_readme_never_creates_it(monkeypatch: pytest.MonkeyPatch) -> None:
     step = StepResult(Step(1, 'python hello.py --count=3', 1), 2,
                       "python: can't open file '/repo/hello.py': [Errno 2] No such file or directory\n")
     result = RunResult('abc', 'image', 'linux/arm64', [step], False)
     monkeypatch.setattr(cli, '_haunt', lambda path, rev, use_ai, on_step=None: (result, classify(step), None, []))
     output = ' '.join(runner.invoke(cli.app, ['haunt']).stdout.split())
-    assert 'file / hello.py' in output and 'The README uses hello.py but no step creates it' in output
+    assert 'file / hello.py' in output and 'hello.py was unavailable during setup' in output
+    assert 'no step creates it' not in output

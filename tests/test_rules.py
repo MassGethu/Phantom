@@ -34,6 +34,14 @@ def test_rule_patterns(output: str, kind: ReqType, name: str) -> None:
     assert finding.evidence in output.splitlines()
 
 
+@pytest.mark.parametrize('error', ['[Errno 13] Permission denied', '[Errno 21] Is a directory'])
+def test_cannot_open_file_does_not_imply_missing_file(error: str) -> None:
+    finding = classify(result(f"python: can't open file '/repo/app.py': {error}"))
+    assert finding.req_type == ReqType.UNKNOWN
+    assert finding.status == Status.OBSERVED
+    assert finding.fix is None
+
+
 SELFLOCK_JAVA_ERROR = "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
 
 

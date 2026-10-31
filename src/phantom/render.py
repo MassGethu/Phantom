@@ -152,14 +152,12 @@ def haunt_result(result: RunResult, finding: Finding | None, ai_note: str | None
     elif command:
         hint(f"Verify and patch it: phantom exorcise {_target(target)}")
     elif finding.req_type == ReqType.TOOL:
-        # A missing tool is a gap in the README or image, not a commit bisect could find.
         tool = finding.name or "the tool"
-        hint(f"Document how to install {tool} in the README, "
-             f"or set PHANTOM_IMAGE to an image that already has it.")
+        hint(f"{tool} is missing from the test environment. Check the documented prerequisites "
+             f"or set PHANTOM_IMAGE to an image that includes it.")
     elif finding.req_type in (ReqType.FILE, ReqType.MODULE) and finding.name:
-        # The README leans on something it never creates; bisect only helps if a commit removed it.
-        hint(f"The README uses {finding.name} but no step creates it. Add that step or fix the "
-             f"path; if it used to work, phantom bisect {_target(target)} finds when it broke.")
+        hint(f"{finding.name} was unavailable during setup. Check the documented prerequisites "
+             f"and path; if it used to work, phantom bisect {_target(target)} finds when it broke.")
     else:
         hint(f"Find the commit that introduced it: phantom bisect {_target(target)}")
 

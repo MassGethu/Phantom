@@ -59,6 +59,11 @@ def test_first_failing_step_stops_the_workflow_like_the_verifier(tmp_path: Path)
     assert result.returncode == 3 and 'one' in result.stdout and 'never' not in result.stdout
 
 
+def test_compound_server_failure_stops_workflow(tmp_path: Path) -> None:
+    result = run_like_github(tmp_path, ['npm() { sleep 0.3; }', 'npm start && false', 'echo never'])
+    assert result.returncode == 1 and 'never' not in result.stdout
+
+
 def test_server_step_does_not_hang_the_workflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, 'SERVER_GRACE', 1)
     result = run_like_github(tmp_path, ['nodemon() { sleep 3; }', 'nodemon', 'echo after'])

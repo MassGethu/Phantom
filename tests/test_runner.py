@@ -52,6 +52,23 @@ def test_ordinary_commands_are_not(command: str) -> None:
     assert not is_long_running(command)
 
 
+@pytest.mark.parametrize('command', [
+    'npm start && false', 'flask run || echo fallback', 'uvicorn app:app; false',
+    'npm start | cat', 'npm start & echo after', 'npm start\nfalse',
+    'npm start $(echo --help)', 'npm start `echo --help`',
+])
+def test_compound_servers_remain_in_foreground(command: str) -> None:
+    assert not is_long_running(command)
+    assert command_lines(1, command) == [command, '__rc=$?']
+
+
+def test_compound_server_waits_for_tail_and_reports_failure() -> None:
+    lines = ['npm() { sleep 0.3; }', *command_lines(1, 'npm start && false'),
+             'echo "rc=$__rc"']
+    result = run_bash('\n'.join(lines) + '\n')
+    assert 'rc=1' in result.stdout and 'phantom-started' not in result.stdout
+
+
 def run_bash(script: str) -> subprocess.CompletedProcess[str]:
     # Fed on stdin exactly like `docker exec -i ... bash -s`.
     return subprocess.run(['bash', '-s'], input=script, capture_output=True, text=True, timeout=30)

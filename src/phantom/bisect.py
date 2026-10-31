@@ -21,7 +21,7 @@ from phantom.runner import (RunFn, error_message, git_output, image_digest, plat
                              resolve_sha, run_steps)
 
 PASS, FAIL, SKIP = "pass", "fail", "skip"
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 EnvironmentFn = Callable[[], tuple[str, str]]
 ProbeFn = Callable[[str, str, bool], None]
 

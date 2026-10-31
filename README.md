@@ -209,10 +209,12 @@ repository is already copied to `/repo`; a skipped `git clone ... && cd repo` re
 the next step to `/repo`, and anything after it on the same line still runs.
 
 Servers and dev watchers (`npm start`, `flask run`, `uvicorn`, `manage.py runserver`,
-`rails s` and similar, from a fixed list) are started in the background. If one is
+`rails s` and similar, from a fixed list) are started in the background when they
+are simple standalone commands. Commands containing shell operators, substitutions,
+or redirections stay in the foreground, so their remaining work is not skipped. If one is
 still running after 10 s it passes as "started" and stays up for later steps, such
 as a `curl` against it; if it exits sooner, its real exit code and output are used.
-The Copilot workflow uses the same template, so a server step cannot hang the job.
+The Copilot workflow uses the same template for standalone servers.
 
 The container is never given host mounts or host environment variables. It is
 removed afterwards, even after a timeout. The resolved image digest and platform

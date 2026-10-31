@@ -100,7 +100,7 @@ def classify(result: StepResult, repo: Path | None = None, sha: str | None = Non
         (ReqType.MODULE, r"ModuleNotFoundError: No module named ['\"]([\w.]+)['\"]"),
         (ReqType.FILE, r"FileNotFoundError:.*?['\"]([^'\"]+)['\"]"),
         # python: can't open file '/repo/hello.py': [Errno 2] No such file or directory
-        (ReqType.FILE, r"can't open file ['\"](?:/repo/)?([^'\"]+)['\"]"),
+        (ReqType.FILE, r"can't open file ['\"](?:/repo/)?([^'\"]+)['\"]:\s*\[Errno 2\] No such file or directory"),
         # uvicorn/gunicorn: Could not import module "main".
         (ReqType.MODULE, r"Could not import module ['\"]([\w.]+)['\"]"),
         (ReqType.FILE, r"(?:^|:\s)([^:\n]+): No such file or directory"),

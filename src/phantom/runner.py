@@ -33,7 +33,9 @@ LONG_RUNNING = re.compile(rf"""^(?:\w+=\S*\s+)*{_RUNNER}(?:
 
 
 def is_long_running(command: str) -> bool:
-    return bool(LONG_RUNNING.match(command)) and not command.rstrip().endswith("&")
+    # Only background simple commands. Conservatively leave shell syntax in the
+    # foreground so an unexecuted tail cannot be mistaken for a passing step.
+    return bool(LONG_RUNNING.match(command)) and not re.search(r"[;&|()`$<>\n\r]", command)
 
 
 SERVER_POLLS_PER_SECOND = 5
